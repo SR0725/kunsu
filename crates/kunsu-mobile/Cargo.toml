@@ -1,0 +1,25 @@
+[package]
+name = "kunsu-mobile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "手機配對與中轉協定（PRD §30.8；docs/design/mobile-relay.md）：純函數，時間與亂數由呼叫端傳入。"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hkdf = "0.12"
+chacha20poly1305 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+base64 = "0.22"
+data-encoding = "2"
+subtle = "2"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rand_chacha = "0.3"

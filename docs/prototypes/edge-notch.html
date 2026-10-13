@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kunsu 邊緣瀏海</title>
+<!--
+  設計原型（非產品程式）：DESIGN.md「Edge notch」與 docs/bdd/edge-notch.md 的可操作參考。
+  幾何採「周長座標」：瀏海是沿螢幕內縮中心線的一段弧長 [s, s+L]，以方形筆刷（厚度 T）
+  掃出黑色帶狀區；跨角時自然成 L 形。所有半徑 = min(名目值, 可用間隙)，保證幾何連續。
+-->
+<style>
+:root {
+  --bg: #e7e9ee; --ink: #15171b; --muted: #5b616c; --panel: #ffffff; --line: #d4d7dd; --accent: #3b4250;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0e1013; --ink: #eceef2; --muted: #8d94a0; --panel: #16191e; --line: #2a2e35; --accent: #c9ced8; }
+}
+:root[data-theme="dark"] { --bg: #0e1013; --ink: #eceef2; --muted: #8d94a0; --panel: #16191e; --line: #2a2e35; --accent: #c9ced8; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Geist Sans", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; }
+main { display: grid; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+header h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; }
+header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-size: 12px; }
+.controls fieldset { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 0; border: 0; }
+.controls legend { float: left; margin-right: 6px; color: var(--muted); }
+.controls button, .controls label { font: inherit; }
+.controls button { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); padding: 4px 9px; cursor: pointer; }
+.controls button[aria-pressed="true"] { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+.device-wrap { position: relative; margin: 0 auto; }
+.device { position: relative; padding: 14px 14px 18px; border-radius: 26px; background: #050505; box-shadow: 0 30px 60px rgba(0,0,0,.28); }
+.display { position: relative; overflow: hidden; border-radius: 12px 12px 4px 4px; background:
+  radial-gradient(120% 90% at 20% 10%, #8fb3d9 0%, transparent 55%),
+  radial-gradient(90% 80% at 85% 85%, #d9a38f 0%, transparent 60%),
+  linear-gradient(160deg, #a9bfd6, #c7b7c9 60%, #d7c2b2); touch-action: none; user-select: none; }
+.menubar { position: absolute; inset: 0 0 auto 0; height: 37px; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: rgba(255,255,255,.28); backdrop-filter: blur(20px); font-size: 13px; color: #111; }
+.menubar .apple { font-weight: 700; }
+.menubar .right { margin-left: auto; display: flex; gap: 14px; }
+.hw-notch { position: absolute; top: 0; left: 50%; width: 190px; height: 37px; transform: translateX(-50%); background: #000; border-radius: 0 0 10px 10px; }
+.window-mock { position: absolute; left: 22%; top: 18%; width: 52%; height: 58%; border-radius: 12px; background: rgba(250,250,252,.92); box-shadow: 0 20px 50px rgba(0,0,0,.25); padding: 44px 24px; color: #333; font-size: 13px; line-height: 1.7; }
+#stage { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.band { cursor: grab; }
+.band[data-dragging="true"] { cursor: grabbing; }
+.toast { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; background: rgba(10,10,12,.86); color: #eef0f3; font-size: 12px; opacity: 0; transition: opacity 180ms ease; pointer-events: none; }
+.toast[data-show="true"] { opacity: 1; }
+.notes { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-size: 12px; line-height: 1.6; color: var(--muted); }
+.notes strong { color: var(--ink); }
+@media (max-width: 720px) { main { padding: 12px 16px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Kunsu 邊緣瀏海（Edge notch）設計原型</h1>
+    <p>拖曳黑色瀏海：它只會貼著螢幕邊緣跑，靠近角落會像貪食蛇一樣轉彎；放開時靠近角落會吸成 L 形。滑鼠停留 0.12 秒會沿邊延長並播放跑馬燈；單擊會開啟決策介面。</p>
+  </header>
+
+  <section class="controls" aria-label="原型控制">
+    <fieldset><legend>位置</legend>
+      <button data-place="corner:tl">左上角</button>
+      <button data-place="corner:tr">右上角</button>
+      <button data-place="edge:left">左側</button>
+      <button data-place="edge:right">右側</button>
+      <button data-place="edge:top">上方</button>
+      <button data-place="edge:bottom">下方</button>
+    </fieldset>
+    <fieldset><legend>來源</legend>
+      <button data-agent="claude" aria-pressed="true">Claude</button>
+      <button data-agent="codex">Codex</button>
+    </fieldset>
+    <fieldset><legend>狀態</legend>
+      <button data-state="pending" aria-pressed="true">倒數中</button>
+      <button data-state="warned">剩 3 分鐘</button>
+      <button data-state="deferred">已到期待安全時機</button>
+    </fieldset>
+    <fieldset><legend>題數</legend>
+      <button data-count="1" aria-pressed="true">1</button>
+      <button data-count="3">3</button>
+    </fieldset>
+    <fieldset><legend>其他</legend>
+      <button data-toggle="reduced">減少動態</button>
+      <button data-toggle="debug">顯示力學判斷</button>
+      <button data-toggle="privacy">模擬分享螢幕</button>
+    </fieldset>
+  </section>
+
+  <div class="device-wrap">
+    <div class="device" id="device">
+      <div class="display" id="display">
+        <div class="menubar"><span class="apple"></span><span>Finder</span><span>檔案</span><span>編輯</span><span>顯示方式</span><div class="right"><span>⌁</span><span>週四 15:42</span></div></div>
+        <div class="hw-notch"></div>
+        <div class="window-mock">這是一般 app 視窗。瀏海以外的區域在正式版中完全穿透點擊（原生游標輪詢切換 ignoresMouseEvents），不會攔截任何操作。</div>
+        <svg id="stage" xmlns="http://www.w3.org/2000/svg" aria-label="Kunsu 邊緣瀏海">
+          <defs>
+            <linearGradient id="codexFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#b9a8f6"/><stop offset=".55" stop-color="#6c78f5"/><stop offset="1" stop-color="#3430ef"/>
+            </linearGradient>
+          </defs>
+          <g id="debug"></g>
+          <g id="band" class="band" role="button" tabindex="-1"></g>
+        </svg>
+        <div class="toast" id="toast">→ 開啟完整決策介面（以圖示中心為轉場起點）</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="notes">
+    <div><strong>力學判斷：</strong>以 EMA 平滑游標速度，預測 120 ms 後的位置，選最近的邊；必須比目前邊近 40 px 以上才換邊（遲滯），所以往下拖會黏在左側，明確往右才會轉上方。</div>
+    <div><strong>連續性：</strong>位置是沿邊的單一弧長座標，換邊時目標在周長上移動，瀏海以臨界阻尼彈簧沿邊滑過去，永不瞬移；所有圓角半徑取「名目值與可用間隙的最小值」，跨角瞬間不會跳形。</div>
+    <div><strong>文字：</strong>中文字永遠直立；直向段由上往下讀，轉角處沿小圓弧（半徑 10）最多傾斜 14° 再回正；英數字詞在直向段旋轉 90°。</div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ───────────── 常數（DESIGN.md Edge notch tokens）─────────────
+  const T = 32            // 厚度
+  const R_CAP = 12        // 自由端內側凸角
+  const R_SH = 7          // 自由端與螢幕邊交界的反向圓角（肩）
+  const R_IN = 14         // L 形內側凹角
+  const RC_TEXT = 10      // 文字中心線轉角小圓弧
+  const M = 40            // 螢幕外延伸（避免邊緣反鋸齒露底）
+  const FONT = 12, TRACK = 1.5
+  const ICON = 18
+  const HOVER_EXTRA = 88
+  const HOVER_DELAY = 120
+  const PREDICT_S = 0.12, HYSTERESIS = 40
+  const DRAG_THRESHOLD = 4
+  const CORNER_SNAP_RATIO = 0.3, EDGE_GAP = 24
+  const MARQUEE_SPEED = 38, MARQUEE_PAUSE = 800
+  const W = 1280, H = 800
+  const CLAUDE_PATH = 'M52.4285 162.873L98.7844 136.879L99.5485 134.602L98.7844 133.334H96.4921L88.7237 132.862L62.2346 132.153L39.3113 131.207L17.0249 130.026L11.4214 128.844L6.2 121.873L6.7094 118.447L11.4214 115.257L18.171 115.847L33.0711 116.911L55.485 118.447L71.6586 119.392L95.728 121.873H99.5485L100.058 120.337L98.7844 119.392L97.7656 118.447L74.5877 102.732L49.4995 86.1905L36.3823 76.62L29.3779 71.7757L25.8121 67.2858L24.2839 57.3608L30.6515 50.2716L39.3113 50.8623L41.4763 51.4531L50.2636 58.1879L68.9842 72.7209L93.4357 90.6804L97.0015 93.6343L98.4374 92.6652L98.6571 91.9801L97.0015 89.2625L83.757 65.2772L69.621 40.8192L63.2534 30.6579L61.5978 24.632C60.9565 22.1032 60.579 20.0111 60.579 17.4246L67.8381 7.49965L71.9133 6.19995L81.7193 7.49965L85.7946 11.0443L91.9074 24.9865L101.714 46.8451L116.996 76.62L121.453 85.4816L123.873 93.6343L124.764 96.1155H126.292V94.6976L127.566 77.9197L129.858 57.3608L132.15 30.8942L132.915 23.4505L136.608 14.4708L143.994 9.62643L149.725 12.344L154.437 19.0788L153.8 23.4505L150.998 41.6463L145.522 70.1215L141.957 89.2625H143.994L146.414 86.7813L156.093 74.0206L172.266 53.698L179.398 45.6635L187.803 36.802L193.152 32.5484H203.34L210.726 43.6549L207.415 55.1159L196.972 68.3492L188.312 79.5739L175.896 96.2095L168.191 109.585L168.882 110.689L170.738 110.53L198.755 104.504L213.91 101.787L231.994 98.7149L240.144 102.496L241.036 106.395L237.852 114.311L218.495 119.037L195.826 123.645L162.07 131.592L161.696 131.893L162.137 132.547L177.36 133.925L183.855 134.279H199.774L229.447 136.524L237.215 141.605L241.8 147.867L241.036 152.711L229.065 158.737L213.019 154.956L175.45 145.977L162.587 142.787H160.805V143.85L171.502 154.366L191.242 172.089L215.82 195.011L217.094 200.682L213.91 205.172L210.599 204.699L188.949 188.394L180.544 181.069L161.696 165.118H160.422V166.772L164.752 173.152L187.803 207.771L188.949 218.405L187.294 221.832L181.308 223.959L174.813 222.777L161.187 203.754L147.305 182.486L136.098 163.345L134.745 164.2L128.075 235.42L125.019 239.082L117.887 241.8L111.902 237.31L108.718 229.984L111.902 215.452L115.722 196.547L118.779 181.541L121.58 162.873L123.291 156.636L123.14 156.219L121.773 156.449L107.699 175.752L86.304 204.699L69.3663 222.777L65.291 224.431L58.2867 220.768L58.9235 214.27L62.8713 208.48L86.304 178.705L100.44 160.155L109.551 149.507L109.462 147.967L108.959 147.924L46.6977 188.512L35.6182 189.93L30.7788 185.44L31.4156 178.115L33.7079 175.752L52.4285 162.873Z'
+
+  const display = document.getElementById('display')
+  const svg = document.getElementById('stage')
+  const bandG = document.getElementById('band')
+  const debugG = document.getElementById('debug')
+  const toast = document.getElementById('toast')
+  display.style.width = W + 'px'; display.style.height = H + 'px'
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+  const NS = 'http://www.w3.org/2000/svg'
+
+  // ───────────── 周長座標 ─────────────
+  const A = W - T, B = H - T, P = 2 * A + 2 * B
+  const CORNER_S = { tl: 0, tr: A, br: A + B, bl: 2 * A + B }
+  const mod = (v, m) => ((v % m) + m) % m
+  const wrapDelta = (d) => { d = mod(d, P); return d > P / 2 ? d - P : d }
+  function edgeOfS(s) { s = mod(s, P); if (s < A) return 'top'; if (s < A + B) return 'right'; if (s < 2 * A + B) return 'bottom'; return 'left' }
+  function pointOnCenterline(s) {
+    s = mod(s, P)
+    if (s < A) return { x: T / 2 + s, y: T / 2 }
+    if (s < A + B) return { x: W - T / 2, y: T / 2 + (s - A) }
+    if (s < 2 * A + B) return { x: W - T / 2 - (s - A - B), y: H - T / 2 }
+    return { x: T / 2, y: H - T / 2 - (s - 2 * A - B) }
+  }
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+  function sOnEdge(edge, p) {
+    if (edge === 'top') return clamp(p.x - T / 2, 0, A)
+    if (edge === 'right') return A + clamp(p.y - T / 2, 0, B)
+    if (edge === 'bottom') return A + B + clamp(W - T / 2 - p.x, 0, A)
+    return 2 * A + B + clamp(H - T / 2 - p.y, 0, B)
+  }
+
+  // 片段：沿周長從 s0 走 len，於角落切開
+  function pieces(s0, len) {
+    const out = []
+    let s = mod(s0, P), remaining = len
+    while (remaining > 1e-6) {
+      const e = edgeOfS(s)
+      const edgeEnd = e === 'top' ? A : e === 'right' ? A + B : e === 'bottom' ? 2 * A + B : P
+      const step = Math.min(remaining, edgeEnd - s)
+      out.push({ edge: e, s0: s, s1: s + step })
+      remaining -= step
+      s = mod(s + step, P)
+      if (out.length > 4) break
+    }
+    return out
+  }
+
+  // 邊的局部座標：u 沿邊（螢幕軸），n 往內深度
+  const toScreen = {
+    top: (u, n) => ({ x: u, y: n }),
+    bottom: (u, n) => ({ x: u, y: H - n }),
+    left: (u, n) => ({ x: n, y: u }),
+    right: (u, n) => ({ x: W - n, y: u }),
+  }
+  const edgeLen = { top: W, bottom: W, left: H, right: H }
+  function centerU(edge, s) { const p = pointOnCenterline(s); return edge === 'top' || edge === 'bottom' ? p.x : p.y }
+
+  function arcPts(c, p0, p1, n = 10) {
+    const r = Math.hypot(p0.x - c.x, p0.y - c.y)
+    const v0 = { x: (p0.x - c.x) / r, y: (p0.y - c.y) / r }
+    const v1 = { x: (p1.x - c.x) / r, y: (p1.y - c.y) / r }
+    const pts = []
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      let x = v0.x * (1 - t) + v1.x * t, y = v0.y * (1 - t) + v1.y * t
+      const l = Math.hypot(x, y) || 1
+      pts.push({ x: c.x + (x / l) * r, y: c.y + (y / l) * r })
+    }
+    return pts
+  }
+  const polyD = (pts) => 'M' + pts.map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join('L') + 'Z'
+
+  // ───────────── 帶狀幾何（方形筆刷 + 連續圓角）─────────────
+  function bandGeometry(s0, len) {
+    const ps = pieces(s0, len)
+    const shapes = [], hit = []
+    const info = ps.map((pc, i) => {
+      const uA = centerU(pc.edge, pc.s0), uB = centerU(pc.edge, pc.s1)
+      return { ...pc, uLo: Math.min(uA, uB), uHi: Math.max(uA, uB), startIsLo: uA <= uB, attachedStart: i > 0, attachedEnd: i < ps.length - 1 }
+    })
+    info.forEach((pc) => {
+      const L = edgeLen[pc.edge]
+      const loAttached = pc.startIsLo ? pc.attachedStart : pc.attachedEnd
+      const hiAttached = pc.startIsLo ? pc.attachedEnd : pc.attachedStart
+      const u0 = loAttached ? -M : pc.uLo - T / 2
+      const u1 = hiAttached ? L + M : pc.uHi + T / 2
+      // 間隙：自由端到垂直螢幕邊的距離；突出量：L 形手臂超出另一臂厚度的長度
+      const clearLo = u0, clearHi = L - u1
+      const protLo = info.length > 1 ? (L - T) - u0 : Infinity
+      const protHi = info.length > 1 ? u1 - T : Infinity
+      const rLo = loAttached ? 0 : Math.max(0, Math.min(R_CAP, clearLo, protLo))
+      const rHi = hiAttached ? 0 : Math.max(0, Math.min(R_CAP, clearHi, protHi))
+      const map = toScreen[pc.edge]
+      const pts = [map(u0, -M), map(u1, -M)]
+      if (rHi > 0.01) pts.push(...arcPts(map(u1 - rHi, T - rHi), map(u1, T - rHi), map(u1 - rHi, T)))
+      else pts.push(map(u1, T))
+      if (rLo > 0.01) pts.push(...arcPts(map(u0 + rLo, T - rLo), map(u0 + rLo, T), map(u0, T - rLo)))
+      else pts.push(map(u0, T))
+      shapes.push(polyD(pts))
+      const a = map(Math.max(0, u0), 0), b = map(Math.min(L, u1), T)
+      hit.push({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) })
+      // 肩：自由端與螢幕邊交界的反向圓角
+      const sh = (u, dir, clear, prot) => {
+        const r = Math.max(0, Math.min(R_SH, clear, prot))
+        if (r < 0.3) return
+        const ue = u + dir * r
+        const q = [map(u - dir, -M), map(ue, -M), ...arcPts(map(ue, r), map(ue, 0), map(u, r)), map(u - dir, r)]
+        shapes.push(polyD(q))
+      }
+      if (!loAttached) sh(u0, -1, clearLo, protLo)
+      if (!hiAttached) sh(u1, +1, clearHi, protHi)
+      pc.u0 = u0; pc.u1 = u1
+    })
+    // L 形內側凹角
+    for (let i = 0; i + 1 < info.length; i++) {
+      const a = info[i], b = info[i + 1]
+      const corner = cornerBetween(a.edge, b.edge)
+      const q = innerCorner[corner]
+      const protA = armProtrusion(a), protB = armProtrusion(b)
+      const r = Math.max(0, Math.min(R_IN, protA, protB))
+      if (r < 0.3) continue
+      const d = inwardDiag[corner]
+      const c = { x: q.x + d.x * r, y: q.y + d.y * r }
+      const pts = [{ x: q.x - d.x, y: q.y - d.y }, { x: q.x + d.x * r, y: q.y - d.y }, ...arcPts(c, { x: q.x + d.x * r, y: q.y }, { x: q.x, y: q.y + d.y * r }), { x: q.x - d.x, y: q.y + d.y * r }]
+      shapes.push(polyD(pts))
+    }
+    return { pieces: info, shapes, hit }
+  }
+  const innerCorner = { tl: { x: T, y: T }, tr: { x: W - T, y: T }, br: { x: W - T, y: H - T }, bl: { x: T, y: H - T } }
+  const inwardDiag = { tl: { x: 1, y: 1 }, tr: { x: -1, y: 1 }, br: { x: -1, y: -1 }, bl: { x: 1, y: -1 } }
+  function cornerBetween(e1, e2) {
+    const k = [e1, e2].sort().join('-')
+    return { 'left-top': 'tl', 'right-top': 'tr', 'bottom-right': 'br', 'bottom-left': 'bl' }[k]
+  }
+  function armProtrusion(pc) {
+    const L = edgeLen[pc.edge]
+    const free = pc.attachedStart && pc.attachedEnd ? Infinity : (pc.u0 < 0 ? pc.u1 - T : (L - T) - pc.u0)
+    return free
+  }
+
+  // ───────────── 文字中心線（含轉角小圓弧）─────────────
+  // 圖示（頭）所在端：ccw = 周長起點端、cw = 周長終點端。靜止時依邊偏好決定，拖曳中凍結。
+  function preferredHead(ps) {
+    const edges = new Set(ps.map((p) => p.edge))
+    if (edges.size === 1) return edges.has('top') || edges.has('right') ? 'ccw' : 'cw'
+    if (edges.has('top') && edges.has('right')) return 'ccw'   // 右上：頭在上臂左端，先右讀再往下
+    if (edges.has('bottom') && edges.has('left')) return 'cw'  // 左下：頭在左臂上端，先往下再右讀
+    if (edges.has('left') && edges.has('top')) return 'cw'     // 左上：頭在上臂右端（使用者草圖 3）
+    return 'ccw'                                               // 右下：頭在右臂上端
+  }
+  function textPath(ps, headEnd) {
+    let ordered = ps.map((p) => ({ edge: p.edge, a: pointOnCenterline(p.s0), b: pointOnCenterline(p.s1) }))
+    if (headEnd === 'cw') ordered = ordered.reverse().map((p) => ({ edge: p.edge, a: p.b, b: p.a }))
+    const prims = []
+    for (let i = 0; i < ordered.length; i++) {
+      const p = ordered[i]
+      let a = { ...p.a }, b = { ...p.b }
+      const dir = unit(sub(b, a))
+      if (i > 0) a = add(a, mul(dir, rcAt(i)))
+      if (i < ordered.length - 1) b = sub(b, mul(dir, rcAt(i + 1)))
+      if (dist(a, b) > 0.01) prims.push({ type: 'line', a, b, len: dist(a, b), dir, vertical: Math.abs(dir.y) > 0.5 })
+      if (i < ordered.length - 1) {
+        const nxt = ordered[i + 1]
+        const ndir = unit(sub(nxt.b, nxt.a))
+        const r = rcAt(i + 1)
+        const k = p.b
+        const s = sub(k, mul(dir, r)), e = add(k, mul(ndir, r))
+        const c = add(s, mul(ndir, r))
+        const a0 = Math.atan2(s.y - c.y, s.x - c.x)
+        let a1 = Math.atan2(e.y - c.y, e.x - c.x)
+        let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI
+        prims.push({ type: 'arc', c, r, a0, da, len: Math.abs(da) * r, fromVertical: Math.abs(dir.y) > 0.5 })
+      }
+    }
+    function rcAt(j) {
+      const before = ordered[j - 1], after = ordered[j]
+      return Math.max(0, Math.min(RC_TEXT, dist(before.a, before.b) / 2, dist(after.a, after.b) / 2))
+    }
+    const total = prims.reduce((n, p) => n + p.len, 0)
+    function at(d) {
+      // 路徑外沿端點切線外插：讓圖示與文字能貼近帶狀區的視覺端點（端點比中心線多 T/2）
+      if (prims.length && (d < 0 || d > total)) {
+        const first = prims[0], lastP = prims[prims.length - 1]
+        const base = d < 0 ? at(0) : at(total)
+        const ext = d < 0 ? d : d - total
+        void first; void lastP
+        return { ...base, x: base.x + base.dir.x * ext, y: base.y + base.dir.y * ext, arc: null }
+      }
+      for (const p of prims) {
+        if (d <= p.len || p === prims[prims.length - 1]) {
+          if (p.type === 'line') {
+            const t = p.len ? d / p.len : 0
+            return { x: p.a.x + (p.b.x - p.a.x) * t, y: p.a.y + (p.b.y - p.a.y) * t, vertical: p.vertical, arc: null, dir: p.dir }
+          }
+          const t = p.len ? d / p.len : 0
+          const ang = p.a0 + p.da * t
+          const dir = { x: -Math.sin(ang) * Math.sign(p.da), y: Math.cos(ang) * Math.sign(p.da) }
+          return { x: p.c.x + p.r * Math.cos(ang), y: p.c.y + p.r * Math.sin(ang), vertical: null, arc: { t, turn: Math.sign(p.da), fromVertical: p.fromVertical }, dir }
+        }
+        d -= p.len
+      }
+    }
+    return { prims, total, at }
+  }
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y })
+  const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y })
+  const mul = (a, k) => ({ x: a.x * k, y: a.y * k })
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+  const unit = (v) => { const l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l } }
+
+  // ───────────── 文字斷詞：中文單字、英數字詞 ─────────────
+  const measureCtx = document.createElement('canvas').getContext('2d')
+  measureCtx.font = `${FONT}px "Geist Sans", "PingFang TC", sans-serif`
+  function tokenize(text) {
+    const re = /[A-Za-z0-9:./%+\-]+|\s+|./gu
+    return (text.match(re) || []).map((s) => {
+      if (/^\s+$/.test(s)) return { s, kind: 'space', adv: 5 }
+      if (/^[A-Za-z0-9:./%+\-]+$/.test(s)) return { s, kind: 'latin', adv: measureCtx.measureText(s).width + TRACK }
+      return { s, kind: 'cjk', adv: FONT + TRACK }
+    })
+  }
+
+  // ───────────── 狀態 ─────────────
+  const state = {
+    s: 0, sTarget: 0, v: 0, len: 0, lenTarget: 0, lenV: 0,
+    edge: 'left', dragging: false, hover: false, hoverTimer: 0, hoverStart: 0,
+    agent: 'claude', qstate: 'pending', count: 1, reduced: false, debug: false, privacy: false,
+    anchorEnd: null, growDir: 1, headEnd: 'cw', textFadeStart: -1e9,
+    pointer: null, lastPred: null,
+  }
+  const QUESTIONS = [
+    'Acme 廣告停 18 天，要重啟還是收攤？',
+    '今天的日記還沒寫，寫完再收工',
+    'Demo 課預算 2,000→2,400 要批准嗎？',
+  ]
+  function restText() {
+    if (state.qstate === 'warned') return '2:41 後強制詢問'
+    if (state.qstate === 'deferred') return '已到期，等待安全時機'
+    return state.count === 1 ? '你有一則待處理通知' : `你有 ${state.count} 則待處理通知`
+  }
+  function marqueeText() {
+    if (state.privacy) return restText()
+    return QUESTIONS.slice(0, state.count).join('　·　')
+  }
+  function restLength() {
+    const w = tokenize(restText()).reduce((n, t) => n + t.adv, 0)
+    return Math.ceil(w + T / 2 + ICON / 2 + 7 + 12)
+  }
+  function centerToStart(sc, len) { return sc - (len - T) / 2 }
+
+  // 預設：左側、頂端在選單列下方
+  function placeDefault() { place('edge:left', true) }
+  function place(spec, immediate) {
+    const len = restLength()
+    const lc = len - T
+    let sc
+    const [kind, where] = spec.split(':')
+    if (kind === 'corner') sc = CORNER_S[where]
+    else if (where === 'left') sc = 2 * A + B + (B - (37 + 8)) - lc / 2 // 頂端於選單列下 8px
+    else if (where === 'right') sc = A + 37 + 8 + lc / 2
+    else if (where === 'top') sc = 260 + lc / 2
+    else sc = A + B + (A - 120 - lc / 2)
+    state.sTarget = mod(sc, P); state.lenTarget = len
+    setHead(preferredHead(pieces(centerToStart(state.sTarget, len), lc)))
+    if (immediate || state.reduced) { state.s = state.sTarget; state.len = len; state.v = 0 }
+  }
+  function setHead(h) {
+    if (h === state.headEnd) return
+    state.headEnd = h
+    state.textFadeStart = performance.now()
+  }
+
+  // ───────────── 拖曳力學 ─────────────
+  let gesture = null
+  function localPoint(evt) {
+    const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY
+    return pt.matrixTransform(svg.getScreenCTM().inverse())
+  }
+  function nearestEdge(p, current) {
+    const d = { top: p.y, right: W - p.x, bottom: H - p.y, left: p.x }
+    let best = current
+    for (const e of Object.keys(d)) if (d[e] + HYSTERESIS < d[best]) best = e
+    // 只有在明顯更近時才換邊；同時避免在多邊之間振盪
+    return best
+  }
+  bandG.addEventListener('pointerdown', (evt) => {
+    if (evt.button !== 0) return
+    const p = localPoint(evt)
+    bandG.setPointerCapture(evt.pointerId)
+    const sGrab = sOnEdge(edgeOfS(state.s + 0), p)
+    gesture = { id: evt.pointerId, start: p, last: p, t: performance.now(), vx: 0, vy: 0, dragged: false, grabOffset: wrapDelta(sGrab - state.s) }
+    state.edge = nearestEdge(p, edgeOfS(state.s))
+  })
+  bandG.addEventListener('pointermove', (evt) => {
+    if (!gesture || evt.pointerId !== gesture.id) return
+    const p = localPoint(evt), now = performance.now()
+    const dt = Math.max(1, now - gesture.t) / 1000
+    const a = 0.35
+    gesture.vx = gesture.vx * (1 - a) + ((p.x - gesture.last.x) / dt) * a
+    gesture.vy = gesture.vy * (1 - a) + ((p.y - gesture.last.y) / dt) * a
+    gesture.last = p; gesture.t = now
+    if (!gesture.dragged && Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) >= DRAG_THRESHOLD) {
+      gesture.dragged = true; state.dragging = true; state.hover = false
+      bandG.dataset.dragging = 'true'
+      state.lenTarget = restLength()
+    }
+    if (!gesture.dragged) return
+    const pred = { x: clamp(p.x + gesture.vx * PREDICT_S, 0, W), y: clamp(p.y + gesture.vy * PREDICT_S, 0, H) }
+    state.lastPred = pred
+    state.edge = nearestEdge(pred, state.edge)
+    state.sTarget = mod(sOnEdge(state.edge, p) - gesture.grabOffset, P)
+    if (state.reduced) { state.s = state.sTarget; state.v = 0 }
+  })
+  function endGesture(evt, cancelled) {
+    if (!gesture || evt.pointerId !== gesture.id) return
+    const g = gesture; gesture = null
+    if (bandG.hasPointerCapture(evt.pointerId)) bandG.releasePointerCapture(evt.pointerId)
+    state.dragging = false; bandG.dataset.dragging = 'false'; state.lastPred = null
+    if (!g.dragged) { if (!cancelled) openDecision(); return }
+    settle()
+  }
+  bandG.addEventListener('pointerup', (e) => endGesture(e, false))
+  bandG.addEventListener('pointercancel', (e) => endGesture(e, true))
+
+  // 放開：靠近角落 → L 形；跨角但不夠近 → 滑回主導邊並留 24px
+  function settle() {
+    const lc = state.lenTarget - T
+    let best = null
+    for (const [k, cs] of Object.entries(CORNER_S)) {
+      const d = wrapDelta(state.sTarget - cs)
+      if (!best || Math.abs(d) < Math.abs(best.d)) best = { k, cs, d }
+    }
+    if (Math.abs(best.d) < lc * CORNER_SNAP_RATIO) state.sTarget = best.cs
+    else if (Math.abs(best.d) < lc / 2 + EDGE_GAP) state.sTarget = mod(best.cs + Math.sign(best.d) * (lc / 2 + EDGE_GAP), P)
+    setHead(preferredHead(pieces(centerToStart(state.sTarget, state.lenTarget), lc)))
+    if (state.reduced) { state.s = state.sTarget; state.v = 0 }
+  }
+
+  // ───────────── Hover：沿邊延長 + 跑馬燈 ─────────────
+  bandG.addEventListener('pointerenter', () => {
+    if (state.dragging) return
+    clearTimeout(state.hoverTimer)
+    state.hoverTimer = setTimeout(() => startHover(), HOVER_DELAY)
+  })
+  bandG.addEventListener('pointerleave', () => {
+    clearTimeout(state.hoverTimer)
+    if (gesture) return
+    state.hoverTimer = setTimeout(() => endHover(), 260)
+  })
+  function startHover() {
+    if (state.dragging || state.hover) return
+    const rest = restLength(), lc = rest - T
+    const start = centerToStart(state.s, rest)
+    // 文字尾端方向延長；若尾端空間不足，改由頭端延長
+    const tailDir = state.headEnd === 'ccw' ? 1 : -1
+    const tailS = state.headEnd === 'ccw' ? start + lc : start
+    const room = roomAlong(tailS, tailDir)
+    state.growDir = room >= HOVER_EXTRA + EDGE_GAP ? tailDir : -tailDir
+    state.hover = true; state.hoverStart = performance.now()
+    state.lenTarget = rest + HOVER_EXTRA
+    state.sTarget = mod(state.s + state.growDir * HOVER_EXTRA / 2, P)
+    if (state.reduced) { state.s = state.sTarget; state.len = state.lenTarget }
+  }
+  function endHover() {
+    if (!state.hover) return
+    state.hover = false
+    state.lenTarget = restLength()
+    state.sTarget = mod(state.sTarget - state.growDir * HOVER_EXTRA / 2, P)
+    if (state.reduced) { state.s = state.sTarget; state.len = state.lenTarget }
+  }
+  function roomAlong(sEnd, dir) {
+    // 到下一個角落（同方向）前還有多少周長
+    let best = Infinity
+    for (const cs of Object.values(CORNER_S)) {
+      const d = mod((cs - sEnd) * dir, P)
+      if (d < best) best = d
+    }
+    return best
+  }
+
+  function openDecision() {
+    toast.dataset.show = 'true'
+    setTimeout(() => (toast.dataset.show = 'false'), 1400)
+  }
+
+  // ───────────── 彈簧動畫 ─────────────
+  function springStep(x, v, target, omega, dt, wrap) {
+    const delta = wrap ? wrapDelta(target - x) : target - x
+    const acc = omega * omega * delta - 2 * omega * v
+    v += acc * dt
+    x += v * dt
+    return [wrap ? mod(x, P) : x, v]
+  }
+  let last = performance.now()
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now
+    tick(dt)
+    render(now)
+    requestAnimationFrame(frame)
+  }
+  // QA：分頁隱藏時 rAF 暫停，可用 __advance(ms) 同步推進模擬
+  window.__advance = (ms, nowMs = performance.now()) => {
+    for (let t = 0; t < ms; t += 16) tick(0.016)
+    render(nowMs)
+  }
+  function tick(dt) {
+    if (!state.reduced) {
+      const omega = state.dragging ? 30 : 17
+      ;[state.s, state.v] = springStep(state.s, state.v, state.sTarget, omega, dt, true)
+      ;[state.len, state.lenV] = springStep(state.len, state.lenV, state.lenTarget, 22, dt, false)
+    }
+  }
+
+  // ───────────── 繪製 ─────────────
+  function render(now) {
+    const lc = Math.max(1, state.len - T)
+    const start = centerToStart(state.s, state.len)
+    const geo = bandGeometry(start, lc)
+    const tp = textPath(pieces(start, lc), state.headEnd)
+    const textAlpha = state.reduced ? 1 : clamp((now - state.textFadeStart) / 180, 0, 1)
+    while (bandG.firstChild) bandG.removeChild(bandG.firstChild)
+    for (const d of geo.shapes) {
+      const el = document.createElementNS(NS, 'path')
+      el.setAttribute('d', d); el.setAttribute('fill', '#000')
+      bandG.appendChild(el)
+    }
+    // 倒數引信：沿內側，從圖示往尾端，長度 = 剩餘比例
+    const fuseFrac = state.qstate === 'warned' ? 0.18 : state.qstate === 'deferred' ? 0 : 0.64
+    const fuseStart = ICON / 2 + 4, fuseLen = Math.max(0, (tp.total + T / 2 - 10 - fuseStart) * fuseFrac)
+    if (fuseLen > 1) {
+      const pts = []
+      for (let d = fuseStart; d <= fuseStart + fuseLen; d += 2) {
+        const q = tp.at(d)
+        const nrm = inwardNormal(q)
+        // 引信走外側（靠螢幕邊），外偏移不會在小圓弧處反折
+        pts.push({ x: q.x - nrm.x * (T / 2 - 4), y: q.y - nrm.y * (T / 2 - 4) })
+      }
+      const fuse = document.createElementNS(NS, 'polyline')
+      fuse.setAttribute('points', pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '))
+      fuse.setAttribute('fill', 'none')
+      fuse.setAttribute('stroke', state.qstate === 'warned' ? '#ef8d86' : '#3b4048')
+      fuse.setAttribute('stroke-width', '1.5'); fuse.setAttribute('stroke-linecap', 'round')
+      bandG.appendChild(fuse)
+    }
+    // 圖示：路徑起點後 T/2
+    const ic = tp.at(0)
+    bandG.appendChild(icon(ic.x, ic.y))
+    // 文字
+    const marquee = state.hover && !state.dragging
+    const text = marquee ? marqueeText() : restText()
+    const toks = tokenize(text)
+    const startD = ICON / 2 + 7, endD = tp.total + T / 2 - 12
+    let offset = 0
+    let stream = toks
+    if (marquee && !state.reduced) {
+      const w = toks.reduce((n, t) => n + t.adv, 0)
+      const gap = 40
+      const elapsed = Math.max(0, now - state.hoverStart - MARQUEE_PAUSE) / 1000
+      if (w > endD - startD) {
+        offset = (elapsed * MARQUEE_SPEED) % (w + gap)
+        stream = [...toks, { s: ' ', kind: 'space', adv: gap }, ...toks]
+      }
+    }
+    let d = startD - offset
+    for (const tk of stream) {
+      const mid = d + tk.adv / 2
+      d += tk.adv
+      if (tk.kind === 'space') continue
+      if (mid < startD - 2 || mid > endD + 2) continue
+      const fade = Math.min(1, (mid - startD + 2) / 10, (endD + 2 - mid) / 10)
+      if (fade <= 0) continue
+      const q = tp.at(mid)
+      let rot = 0
+      if (tk.kind === 'cjk') {
+        if (q.arc) rot = q.arc.turn * 14 * Math.sin(Math.PI * q.arc.t)
+      } else {
+        if (q.arc) rot = q.arc.fromVertical ? 90 * (1 - q.arc.t) : 90 * q.arc.t
+        else rot = q.vertical ? 90 : 0
+      }
+      const el = document.createElementNS(NS, 'text')
+      el.textContent = tk.s
+      el.setAttribute('x', q.x.toFixed(2)); el.setAttribute('y', q.y.toFixed(2))
+      el.setAttribute('text-anchor', 'middle'); el.setAttribute('dominant-baseline', 'central')
+      el.setAttribute('font-size', FONT); el.setAttribute('font-family', '"Geist Sans","PingFang TC",sans-serif')
+      el.setAttribute('fill', state.qstate === 'warned' && !marquee ? '#ef8d86' : '#b4bac4')
+      el.setAttribute('opacity', (fade * textAlpha).toFixed(2))
+      el.setAttribute('transform', `rotate(${rot.toFixed(2)} ${q.x.toFixed(2)} ${q.y.toFixed(2)})`)
+      bandG.appendChild(el)
+    }
+    renderDebug(geo)
+  }
+  function inwardNormal(q) {
+    const a = { x: -q.dir.y, y: q.dir.x }, b = { x: q.dir.y, y: -q.dir.x }
+    const toC = { x: W / 2 - q.x, y: H / 2 - q.y }
+    return a.x * toC.x + a.y * toC.y > 0 ? a : b
+  }
+  function icon(x, y) {
+    const g = document.createElementNS(NS, 'g')
+    if (state.agent === 'claude') {
+      const s = ICON / 248
+      g.setAttribute('transform', `translate(${(x - ICON / 2).toFixed(2)} ${(y - ICON / 2).toFixed(2)}) scale(${s})`)
+      const p = document.createElementNS(NS, 'path')
+      p.setAttribute('d', CLAUDE_PATH); p.setAttribute('fill', '#D97757')
+      g.appendChild(p)
+    } else {
+      // Codex：花瓣雲 + >_（依 Codex app icon 簡化）
+      const s = ICON / 24
+      g.setAttribute('transform', `translate(${(x - ICON / 2).toFixed(2)} ${(y - ICON / 2).toFixed(2)}) scale(${s})`)
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + Math.PI / 8
+        const c = document.createElementNS(NS, 'circle')
+        c.setAttribute('cx', (12 + Math.cos(a) * 6.2).toFixed(2)); c.setAttribute('cy', (12 + Math.sin(a) * 6.2).toFixed(2))
+        c.setAttribute('r', '4.6'); c.setAttribute('fill', 'url(#codexFill)')
+        g.appendChild(c)
+      }
+      const core = document.createElementNS(NS, 'circle')
+      core.setAttribute('cx', '12'); core.setAttribute('cy', '12'); core.setAttribute('r', '7.2'); core.setAttribute('fill', 'url(#codexFill)')
+      g.appendChild(core)
+      const prompt = document.createElementNS(NS, 'path')
+      prompt.setAttribute('d', 'M8.4 9.2 L10.9 12 L8.4 14.8 M12.6 14.8 H16')
+      prompt.setAttribute('fill', 'none'); prompt.setAttribute('stroke', '#f2f3ff'); prompt.setAttribute('stroke-width', '1.7')
+      prompt.setAttribute('stroke-linecap', 'round'); prompt.setAttribute('stroke-linejoin', 'round')
+      g.appendChild(prompt)
+    }
+    return g
+  }
+  function renderDebug(geo) {
+    while (debugG.firstChild) debugG.removeChild(debugG.firstChild)
+    if (!state.debug) return
+    for (const r of geo.hit) {
+      const el = document.createElementNS(NS, 'rect')
+      el.setAttribute('x', r.x - 2); el.setAttribute('y', r.y - 2); el.setAttribute('width', r.w + 4); el.setAttribute('height', r.h + 4)
+      el.setAttribute('fill', 'none'); el.setAttribute('stroke', '#ff3b6b'); el.setAttribute('stroke-dasharray', '4 3')
+      debugG.appendChild(el)
+    }
+    const edgeLine = { top: [0, 1, W, 1], bottom: [0, H - 1, W, H - 1], left: [1, 0, 1, H], right: [W - 1, 0, W - 1, H] }[state.edge]
+    const l = document.createElementNS(NS, 'line')
+    l.setAttribute('x1', edgeLine[0]); l.setAttribute('y1', edgeLine[1]); l.setAttribute('x2', edgeLine[2]); l.setAttribute('y2', edgeLine[3])
+    l.setAttribute('stroke', '#22c55e'); l.setAttribute('stroke-width', '3')
+    debugG.appendChild(l)
+    if (state.lastPred) {
+      const c = document.createElementNS(NS, 'circle')
+      c.setAttribute('cx', state.lastPred.x); c.setAttribute('cy', state.lastPred.y); c.setAttribute('r', 6)
+      c.setAttribute('fill', 'rgba(34,197,94,.5)')
+      debugG.appendChild(c)
+    }
+  }
+
+  // ───────────── 控制列 ─────────────
+  function pressGroup(attr, value) {
+    document.querySelectorAll(`[${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)))
+  }
+  document.querySelectorAll('[data-place]').forEach((b) => b.addEventListener('click', () => place(b.dataset.place, false)))
+  document.querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => { state.agent = b.dataset.agent; pressGroup('data-agent', state.agent) }))
+  document.querySelectorAll('[data-state]').forEach((b) => b.addEventListener('click', () => { state.qstate = b.dataset.state; pressGroup('data-state', state.qstate); state.lenTarget = state.hover ? restLength() + HOVER_EXTRA : restLength() }))
+  document.querySelectorAll('[data-count]').forEach((b) => b.addEventListener('click', () => { state.count = Number(b.dataset.count); pressGroup('data-count', b.dataset.count); state.lenTarget = state.hover ? restLength() + HOVER_EXTRA : restLength() }))
+  document.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
+    const k = b.dataset.toggle; state[k] = !state[k]; b.setAttribute('aria-pressed', String(state[k]))
+  }))
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+  if (mq.matches) { state.reduced = true; document.querySelector('[data-toggle="reduced"]').setAttribute('aria-pressed', 'true') }
+
+  // 依視窗寬度縮放裝置
+  const device = document.getElementById('device')
+  function fit() {
+    const avail = Math.min(window.innerWidth - 32, 1400)
+    const dw = W + 28, dh = H + 32
+    const scale = Math.min(1, avail / dw)
+    device.style.position = 'absolute'; device.style.left = '0'; device.style.top = '0'
+    device.style.transform = `scale(${scale})`
+    device.style.transformOrigin = 'top left'
+    device.parentElement.style.width = (dw * scale) + 'px'
+    device.parentElement.style.height = (dh * scale) + 'px'
+  }
+  window.addEventListener('resize', fit); fit()
+
+  placeDefault()
+  window.__notch = state
+  requestAnimationFrame(frame)
+})()
+</script>
+</body>
+</html>

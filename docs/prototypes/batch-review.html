@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kunsu 題組</title>
+<!--
+  設計原型（非產品程式）：題組（kind=batch）。一題裡放 N 個項目（例如 10 封回信草稿），
+  使用者在同一個面板逐項看、改、決定，或一鍵全部採用／全部退回請 AI 重寫。
+  左欄跟著目前選中的項目顯示原文（來信全文、留言串），右欄是項目清單與總結列。
+  第二個分頁是其他題型的構想草圖（多選、排序、數值、時間）。所有資料都是假的。
+-->
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #000; color: #f2f3f5;
+  font: 14px/1.55 "Geist Sans", -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  --card: #0b0c0e; --card-2: #111317; --hair: #1d2026; --hair-2: #2a2e35;
+  --ink: #f2f3f5; --ink-2: #c3c7ce; --ink-3: #8b919b; --ink-4: #5f6570;
+  --accent: #3987e5; --good: #83c494; --bad: #ef8d86; --warn: #e0b35a;
+}
+button, textarea, input { font: inherit; color: inherit; }
+.tabular { font-variant-numeric: tabular-nums; }
+.proto-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--hair); background: #050607; font-size: 12px; color: var(--ink-3); }
+.proto-bar b { color: var(--ink-2); font-weight: 600; }
+.proto-bar button { border: 1px solid var(--hair-2); border-radius: 999px; background: transparent; padding: 3px 10px; cursor: pointer; color: var(--ink-2); }
+.proto-bar button[aria-pressed="true"] { background: #f2f3f5; color: #000; border-color: #f2f3f5; }
+.proto-bar .sep { width: 1px; height: 16px; background: var(--hair-2); }
+
+/* 面板 */
+.surface { display: grid; grid-template-rows: 64px minmax(0, 1fr); height: calc(100vh - 45px); min-height: 640px; }
+.head { display: flex; align-items: center; gap: 12px; padding: 0 28px; border-bottom: 1px solid var(--hair); }
+.mark { width: 24px; height: 24px; border-radius: 6px; background: radial-gradient(circle at 40% 40%, #f0a07c, #d0613c); }
+.head .name { font-weight: 600; }
+.chip { border: 1px solid var(--hair-2); border-radius: 999px; padding: 2px 10px; color: var(--ink-2); font-size: 12px; }
+.muted { color: var(--ink-3); font-size: 12px; }
+.later { margin-left: auto; border: 1px solid var(--hair-2); border-radius: 999px; background: transparent; padding: 6px 14px; cursor: pointer; }
+.later kbd, .send kbd { margin-left: 6px; border: 1px solid var(--hair-2); border-radius: 5px; padding: 0 5px; font-size: 11px; color: var(--ink-3); }
+
+.body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); min-height: 0; }
+.evidence { overflow: auto; padding: 24px 28px; border-right: 1px solid var(--hair); display: grid; align-content: start; gap: 14px; }
+.card { border: 1px solid var(--hair); border-radius: 14px; background: var(--card); padding: 16px 18px; }
+.label { color: var(--ink-3); font-size: 12px; margin-bottom: 8px; }
+.steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.steps li { display: grid; grid-template-columns: 44px 1fr; gap: 10px; color: var(--ink-2); }
+.steps time { color: var(--ink-4); }
+.mail-head { display: grid; gap: 2px; margin-bottom: 10px; }
+.mail-head .from { font-weight: 600; }
+.mail-body { white-space: pre-wrap; color: var(--ink-2); overflow-wrap: anywhere; }
+.thread-note { color: var(--ink-4); font-size: 12px; margin-top: 10px; }
+
+.decide { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0; }
+.decide-top { padding: 22px 28px 10px; }
+.eyebrow { color: var(--ink-3); font-size: 12px; }
+.decide h1 { margin: 4px 0 6px; font-size: 26px; font-weight: 650; letter-spacing: -.01em; }
+.consequence { color: var(--ink-3); font-size: 13px; }
+.consequence b { color: var(--ink); font-weight: 600; }
+
+.bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 28px 12px; border-bottom: 1px solid var(--hair); }
+.bulk button { border: 1px solid var(--hair-2); border-radius: 10px; background: var(--card-2); padding: 7px 12px; cursor: pointer; }
+.bulk button.ghost { background: transparent; color: var(--ink-2); }
+.bulk .hint { margin-left: auto; color: var(--ink-4); font-size: 12px; }
+.redo { display: none; margin: 0 28px 12px; border: 1px solid var(--hair-2); border-radius: 12px; background: var(--card); padding: 12px; }
+.redo[data-open="true"] { display: grid; gap: 8px; }
+.redo textarea { width: 100%; min-height: 64px; resize: none; border: 1px solid var(--hair-2); border-radius: 10px; background: #000; padding: 10px 12px; }
+.redo .row { display: flex; gap: 8px; justify-content: flex-end; }
+.redo button { border: 1px solid var(--hair-2); border-radius: 10px; background: transparent; padding: 6px 12px; cursor: pointer; }
+.redo button.primary { background: #f2f3f5; color: #000; border-color: #f2f3f5; }
+
+.list { overflow: auto; padding: 14px 28px 20px; display: grid; align-content: start; gap: 10px; }
+.item { border: 1px solid var(--hair); border-radius: 14px; background: var(--card); padding: 12px 14px 12px; transition: border-color 150ms ease, background 150ms ease; }
+.item[data-focus="true"] { border-color: #4a515c; background: var(--card-2); }
+.item[data-action="skip"] { opacity: .62; }
+.item-head { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.num { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--hair-2); border-radius: 6px; font-size: 12px; color: var(--ink-3); flex: none; }
+.who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subj { color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.status { flex: none; border-radius: 999px; padding: 1px 9px; font-size: 11px; border: 1px solid var(--hair-2); color: var(--ink-3); }
+.status[data-s="approve"] { color: var(--good); border-color: rgba(131,196,148,.35); }
+.status[data-s="edited"] { color: #9cc2f3; border-color: rgba(57,135,229,.45); }
+.status[data-s="skip"] { color: var(--ink-3); }
+.status[data-s="revise"] { color: var(--warn); border-color: rgba(224,179,90,.45); }
+.excerpt { margin: 6px 0 8px 32px; color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft { margin-left: 32px; }
+.draft textarea { display: block; width: 100%; resize: none; overflow: hidden; border: 1px solid var(--hair-2); border-radius: 10px; background: #000; padding: 10px 12px; line-height: 1.6; color: var(--ink); }
+.draft textarea:focus { outline: none; border-color: #6b7380; }
+.item[data-action="skip"] .draft textarea, .item[data-action="revise"] .draft textarea { color: var(--ink-3); }
+.draft-meta { display: flex; justify-content: space-between; color: var(--ink-4); font-size: 11px; margin-top: 4px; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 32px; }
+.acts button { border: 1px solid var(--hair-2); border-radius: 999px; background: transparent; padding: 3px 11px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.acts button[aria-pressed="true"] { background: #f2f3f5; color: #000; border-color: #f2f3f5; }
+.acts kbd { color: var(--ink-4); font-size: 10px; margin-left: 4px; }
+.acts button[aria-pressed="true"] kbd { color: #555; }
+.note { display: none; margin: 8px 0 0 32px; }
+.item[data-action="revise"] .note { display: block; }
+.note input { width: 100%; border: 1px solid rgba(224,179,90,.45); border-radius: 10px; background: #000; padding: 8px 12px; }
+
+.foot { display: flex; align-items: center; gap: 14px; padding: 14px 28px; border-top: 1px solid var(--hair); }
+.reject { border: 0; background: transparent; color: var(--ink-3); cursor: pointer; padding: 0; }
+.summary { margin-left: auto; color: var(--ink-2); font-size: 13px; }
+.summary span + span::before { content: "·"; margin: 0 7px; color: var(--ink-4); }
+.send { border: 0; border-radius: 999px; background: #f2f3f5; color: #000; font-weight: 650; padding: 11px 22px; cursor: pointer; }
+.send:disabled { background: #2a2e35; color: #8b919b; cursor: not-allowed; }
+
+.receipt { padding: 22px 28px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.rc { display: flex; gap: 10px; align-items: baseline; color: var(--ink-2); }
+.rc i { font-style: normal; color: var(--good); }
+.rc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.rc-list li { display: flex; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.rc-list li .status { margin-left: auto; }
+
+/* 其他題型 */
+.gallery { display: none; padding: 24px 28px 48px; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-content: start; }
+.gallery[data-on="true"] { display: grid; }
+.gallery h2 { margin: 0 0 4px; font-size: 16px; }
+.gallery p { margin: 0 0 12px; color: var(--ink-3); font-size: 13px; }
+.mini { border: 1px solid var(--hair); border-radius: 14px; background: var(--card); padding: 16px; }
+.opt { display: flex; align-items: center; gap: 10px; border: 1px solid var(--hair-2); border-radius: 10px; padding: 8px 10px; margin-top: 6px; }
+.opt .box { width: 16px; height: 16px; border: 1px solid #6b7380; border-radius: 4px; display: grid; place-items: center; font-size: 11px; }
+.opt[data-on="true"] { border-color: #6b7380; background: var(--card-2); }
+.opt[data-on="true"] .box { background: #f2f3f5; color: #000; }
+.grip { color: var(--ink-4); cursor: grab; }
+.range { width: 100%; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.slots button { border: 1px solid var(--hair-2); border-radius: 10px; background: transparent; padding: 8px; cursor: pointer; }
+.slots button[aria-pressed="true"] { background: #f2f3f5; color: #000; }
+.why-note { color: var(--ink-4); font-size: 12px; margin-top: 10px; }
+
+@media (max-width: 1100px) {
+  .body { grid-template-columns: 1fr; overflow: auto; }
+  .evidence { border-right: 0; border-bottom: 1px solid var(--hair); }
+  .surface { height: auto; }
+  .list { overflow: visible; }
+}
+</style>
+</head>
+<body>
+<div class="proto-bar">
+  <b>Kunsu 題組原型</b>
+  <span>情境</span>
+  <button type="button" data-variant="email" aria-pressed="true">回信草稿 10 封</button>
+  <button type="button" data-variant="threads" aria-pressed="false">Threads 留言回覆 6 則</button>
+  <button type="button" data-variant="approve" aria-pressed="false">逐項核可：退款申請 5 筆</button>
+  <span class="sep"></span>
+  <button type="button" data-page="others" aria-pressed="false">其他題型構想</button>
+  <span class="sep"></span>
+  <span>鍵盤：J／K 換項目、E 編輯、A 採用、X 不處理、R 請 AI 改、⌘Enter 送出</span>
+</div>
+
+<div class="surface" id="surface">
+  <header class="head">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="name">Claude</span>
+    <span class="chip" id="task-chip">每日收信 · 排程</span>
+    <span class="muted tabular">09:12 提出</span>
+    <button type="button" class="later">稍後再問（15 分鐘後再問）<kbd>Esc</kbd></button>
+  </header>
+  <div class="body" id="body">
+    <section class="evidence" aria-label="脈絡與證據">
+      <div class="card">
+        <div class="label">為什麼問你</div>
+        <ol class="steps" id="why"></ol>
+      </div>
+      <div class="card" id="original" aria-live="polite"></div>
+    </section>
+    <section class="decide" id="decide">
+      <div class="decide-top">
+        <div class="eyebrow" id="eyebrow">要你決定 · 題組</div>
+        <h1 id="title"></h1>
+        <div class="consequence" id="consequence"></div>
+      </div>
+      <div>
+        <div class="bulk" id="bulk">
+          <button type="button" id="approve-all">全部採用 AI 草稿</button>
+          <button type="button" class="ghost" id="redo-all">全部退回，請 AI 重寫…</button>
+          <span class="hint" id="bulk-hint">逐項改完再送，或一鍵處理全部</span>
+        </div>
+        <div class="redo" id="redo" data-open="false">
+          <div class="label" style="margin:0">跟 AI 說要怎麼改（套用到所有項目）</div>
+          <textarea id="redo-text" placeholder="例如：語氣再正式一點，每封結尾附上課程頁連結，不要用驚嘆號"></textarea>
+          <div class="row">
+            <button type="button" id="redo-cancel">取消</button>
+            <button type="button" class="primary" id="redo-send">全部退回重寫</button>
+          </div>
+        </div>
+      </div>
+      <div class="list" id="list" role="list"></div>
+      <footer class="foot" id="foot">
+        <button type="button" class="reject">這題不該問我</button>
+        <span class="summary tabular" id="summary"></span>
+        <button type="button" class="send" id="send">送出決定 <kbd>⌘⏎</kbd></button>
+      </footer>
+    </section>
+  </div>
+
+  <section class="gallery" id="gallery" data-on="false" aria-label="其他題型構想">
+    <div class="mini">
+      <h2>多選題（挑幾個）</h2>
+      <p>從一組項目裡挑出要做的，可設最少／最多幾個。例：12 支素材挑 5 支上架、這週要接哪些合作邀約。</p>
+      <div id="multi"></div>
+      <div class="why-note">已選 <b id="multi-count">2</b> / 最多 5</div>
+    </div>
+    <div class="mini">
+      <h2>排序題（排先後）</h2>
+      <p>把項目排出優先順序，拖曳或用 ⌥↑／⌥↓ 移動。例：本週三個目標排順序、待辦清單排先後、候選講題排序。</p>
+      <div id="rank"></div>
+    </div>
+    <div class="mini">
+      <h2>數值題（給一個數字）</h2>
+      <p>在 AI 給的範圍內拉出一個數字，旁邊即時顯示後果。例：這週要寫幾篇、合作報價開多少。動錢的數字仍走既有的錢題授權鏈。</p>
+      <input class="range" type="range" min="3000" max="20000" step="500" value="8000" id="price">
+      <div class="consequence" style="margin-top:8px">報價 <b class="tabular" id="price-v">NT$8,000</b> · 對方預算上限 NT$12,000 · 去年同類合作 NT$6,500</div>
+    </div>
+    <div class="mini">
+      <h2>時間題（挑時段）</h2>
+      <p>從 AI 對過行事曆的空檔裡挑一個。例：Podcast 錄音、客戶通話、文章發布時間。</p>
+      <div class="slots" id="slots"></div>
+      <div class="why-note">已避開你行事曆上的會議與專注時段</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const VARIANTS = {
+  email: {
+    task: '每日收信 · 排程',
+    title: '今天 10 封信的回覆草稿',
+    consequence: '<b>不決的後果：</b>10 封信今天都不會回；其中 3 封是學員卡住的問題。',
+    noun: '封', verbApprove: '寄出', editable: true,
+    why: [['09:00', '排程收信：今天 14 封新信，4 封是廣告已封存'], ['09:08', '10 封需要你回，已依你過去的回信語氣寫好草稿'], ['現在', '要你看過再寄；你確認的文字會一字不改寄出']],
+    items: [
+      ['陳同學', '課程影片第 5 章打不開', '老師好，我買了 Demo 課，第 5 章的影片一直轉圈圈，換瀏覽器也一樣……', '老師好，我在 10/6 買了 Demo 實戰課，今天看到第 5 章「SwiftUI 動畫」時影片一直轉圈圈，換了 Chrome 和 Safari 都一樣，手機也不行。想請問是不是我的帳號有問題？訂單編號 #A1029。', '陳同學你好，謝謝回報！第 5 章的影片昨晚更新後有部分學員打不開，我們已經修好了，請重新整理頁面再試一次。如果還是不行，回信告訴我你用的裝置，我直接幫你處理。'],
+      ['某品牌窗口（品牌合作）', '想邀請合作開箱影片', '您好，我們是某咖啡品牌，想邀請您在 Threads 分享新品……', '您好，我們是某咖啡品牌的行銷，看到您在 Threads 分享工作日常，想邀請您開箱我們的冷萃新品，提供產品與稿酬，形式可討論。', '您好，謝謝邀請！目前我的內容主軸是 AI 與開發，咖啡開箱可能跟受眾比較不貼。如果之後有跟「工作效率」相關的合作，很歡迎再找我。'],
+      ['王先生', '需要開立公司發票', '你好，我們公司買了 3 個名額，需要開統編發票……', '你好，我們公司幫 3 位同仁報名了 Sample Pro 課，需要開立三聯式發票，統編 1234XXXX，抬頭為某某科技有限公司。', '王先生你好，收到！三聯式發票會在 3 個工作天內寄到報名時的信箱，抬頭與統編我會照你提供的資料開立。有其他需要再跟我說。'],
+      ['Podcast 製作人', '邀請上節目聊一人公司', '嗨，我們的節目在聊獨立工作者，想邀你來錄一集……', '嗨，我們的節目「某某創業聊」在聊獨立工作者，想邀你來錄一集聊一人公司怎麼用 AI，錄音約 60 分鐘，可以遠端。', '你好，謝謝邀請，這個題目我很有興趣！可以的話我們約下週二或週四下午錄，60 分鐘遠端沒問題。可以先給我大綱嗎？'],
+      ['張同學', '可以退費嗎？', '老師，我買課後發現時間不夠，請問可以退費嗎……', '老師好，我上週買了 Sample Pro 課，但最近工作太忙可能沒時間看，請問還可以退費嗎？我只看了第一章。', '張同學你好，課程購買 7 天內、觀看進度在 20% 以內都可以全額退費，你符合條件。我這邊先幫你處理，款項約 5–7 個工作天退回原付款方式。'],
+      ['合作夥伴 Kevin', '上次的聯名企劃進度？', '上次聊的聯名企劃，想確認一下你那邊的時程……', '上次聊的聯名直播企劃，想確認你那邊 11 月的時程，我們這邊希望 11/15 前定案。', 'Kevin 你好，抱歉晚回！11 月我可以，11/15 前定案沒問題。這週五前我把我這邊的大綱寄給你。'],
+      ['某大學 系學會', '邀請演講：AI 與職涯', '您好，系學會想邀請您來分享 AI 如何改變工程師的工作……', '您好，我們是某大學資工系學會，12 月想辦一場「AI 與職涯」講座，想邀請您分享約 90 分鐘，有車馬費。', '你好，謝謝邀請！12 月上旬我時間比較滿，中下旬可以安排，90 分鐘沒問題。可以先告訴我場地、人數和車馬費金額嗎？'],
+      ['李同學', '作業的 API key 要放哪？', '老師，第 3 章作業要串 OpenAI，key 要放在哪裡比較安全……', '老師好，第 3 章作業要串 API，請問 key 要放在哪裡比較安全？直接寫在程式碼裡可以嗎？', '李同學好問題！不要寫在程式碼裡，放在 .env 檔並加進 .gitignore，部署時改用平台的環境變數設定。第 3 章的附件有範例，可以照著做。'],
+      ['某軟體廠商', '升級企業方案優惠', '親愛的客戶，您的方案即將到期，現在升級享 8 折……', '親愛的客戶，您的團隊方案將於 10/31 到期，現在升級企業方案享 8 折優惠，名額有限。', ''],
+      ['趙小姐（舊學員）', '想問進階課什麼時候開', '老師，上完 Demo 課很有收穫，請問有進階課嗎……', '老師，上完 Demo 課很有收穫，請問之後會開進階課嗎？想學 SwiftData 和上架流程。', '趙小姐你好，謝謝支持！進階課預計明年第一季開，會包含 SwiftData 和上架流程。開放報名時我會先寄信通知舊學員，舊學員有早鳥價。'],
+    ],
+    defaultSkip: [8],
+  },
+  threads: {
+    task: 'Threads 互動 · 排程',
+    title: '6 則留言的回覆草稿',
+    consequence: '<b>不決的後果：</b>這 6 則留言超過 24 小時沒回，演算法會降低這篇的觸及。',
+    noun: '則', verbApprove: '回覆', editable: true,
+    why: [['08:30', '昨晚那篇「一人公司的 AI 分工」有 41 則新留言'], ['08:40', '挑出 6 則值得回的（提問、反對意見、潛在合作）'], ['現在', '你確認後我會用你的帳號逐則回覆']],
+    items: [
+      ['@dev_amy', '請問 Kunsu 會開源嗎？', '想問你做的那個強制決策收件匣會開源嗎？', '想問你做的那個強制決策收件匣會開源嗎？好想用！', '還在自己用、每天在改，等穩定一點會考慮！你最想用它來處理什麼？'],
+      ['@pm_leo', '這樣不會被 AI 綁架嗎？', '全部讓 AI 做，最後你只是在按按鈕吧……', '全部讓 AI 做，最後你只是在按按鈕吧，這樣不會被 AI 綁架嗎？', '好問題。我按的每個按鈕都是「方向」：要不要做、做哪個、錢花在哪。實作交給 AI，判斷留給自己。'],
+      ['@studio_k', '有在接企業顧問嗎', '我們公司也想導入類似流程，有在接顧問嗎？', '我們公司也想導入類似流程，有在接顧問嗎？', '有的，私訊我你們團隊的規模和現在卡住的地方，我先看適不適合。'],
+      ['@nightowl', '一天花多少錢在 AI 上', '好奇你一天花多少在這些 AI 工具上', '好奇你一天花多少在這些 AI 工具上？', '平均一天大概一杯手搖飲到一個便當之間，換回來的是 3–4 個小時。'],
+      ['@ex_coworker', '好久不見！', '哈哈好久不見，看到你在做這個', '哈哈好久不見，看到你在做這個超酷！', '好久不見！最近好嗎？有空來喝咖啡聊聊～'],
+      ['@troll_42', '又在業配', '又在業配自己的東西', '又在業配自己的東西，無聊', ''],
+    ],
+    defaultSkip: [5],
+  },
+  approve: {
+    task: '退款審核 · 排程',
+    title: '5 筆退款申請要你核可',
+    consequence: '<b>不決的後果：</b>5 位學員的退款會超過 7 天承諾期限。',
+    noun: '筆', verbApprove: '核准', editable: false,
+    why: [['10:00', '本週 5 筆退款申請，都已對過訂單與觀看紀錄'], ['10:05', '4 筆符合規則（7 天內、進度 20% 以內），1 筆超過'], ['現在', '核可後我會在金流後台逐筆退款']],
+    items: [
+      ['張同學', 'Sample Pro · NT$4,800', '購買 3 天、進度 8%', '購買日 10/5，觀看進度 8%，理由：工作太忙。', '符合退費規則：7 天內、進度 20% 以內 → 建議全額退款 NT$4,800'],
+      ['吳先生', 'Demo 課 · NT$6,800', '購買 6 天、進度 15%', '購買日 10/2，觀看進度 15%，理由：內容比預期基礎。', '符合退費規則 → 建議全額退款 NT$6,800'],
+      ['周小姐', 'Demo 課 · NT$6,800', '購買 12 天、進度 64%', '購買日 9/26，觀看進度 64%，理由：找到工作了用不到。', '超過 7 天且進度 64%，不符規則 → 建議婉拒，改提供延長觀看期限'],
+      ['鄭同學', 'Sample Pro · NT$4,800', '購買 1 天、進度 0%', '購買日 10/7，觀看進度 0%，理由：重複購買。', '重複購買 → 建議全額退款 NT$4,800'],
+      ['許先生', 'Sample Pro · NT$4,800', '購買 5 天、進度 19%', '購買日 10/3，觀看進度 19%，理由：家人生病。', '符合退費規則 → 建議全額退款 NT$4,800'],
+    ],
+    defaultSkip: [2],
+  },
+}
+
+let variant = 'email'
+let items = []
+let focus = 0
+let submitted = false
+
+function load(name) {
+  variant = name
+  const v = VARIANTS[name]
+  items = v.items.map(([who, subj, excerpt, body, draft], i) => ({
+    id: `i${i + 1}`, who, subj, excerpt, body, draft, text: draft,
+    action: v.defaultSkip.includes(i) ? 'skip' : 'approve', note: '',
+  }))
+  focus = 0
+  submitted = false
+  document.getElementById('task-chip').textContent = v.task
+  document.getElementById('title').textContent = v.title
+  document.getElementById('consequence').innerHTML = v.consequence
+  document.getElementById('approve-all').textContent = v.editable ? '全部採用 AI 草稿' : '全部照 AI 建議'
+  document.getElementById('why').innerHTML = v.why.map(([t, s]) => `<li><time class="tabular">${t}</time><span>${s}</span></li>`).join('')
+  document.getElementById('redo').dataset.open = 'false'
+  renderList()
+  renderOriginal()
+  renderSummary()
+}
+
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+function statusOf(it) {
+  if (it.action === 'skip') return ['skip', '不處理']
+  if (it.action === 'revise') return ['revise', '請 AI 改']
+  if (it.text !== it.draft) return ['edited', '你改過']
+  return ['approve', '採用']
+}
+
+function renderList() {
+  const v = VARIANTS[variant]
+  const list = document.getElementById('list')
+  list.innerHTML = items.map((it, i) => {
+    const [s, label] = statusOf(it)
+    const draft = v.editable
+      // 2026-10-09 Ray：AI 建議不處理的項目給空草稿（不准「（建議不回）」這類佔位文字，會被原樣寄出）。
+      ? `<div class="draft"><textarea data-i="${i}" rows="3" placeholder="${it.draft ? '' : 'AI 建議不處理；要回覆就先寫好內容再採用'}" aria-label="第 ${i + 1} ${v.noun}的回覆草稿">${esc(it.text)}</textarea>
+          <div class="draft-meta"><span>${it.text !== it.draft ? '已修改 · <a href="#" data-reset="' + i + '" style="color:inherit">還原 AI 版本</a>' : 'AI 草稿'}</span><span class="tabular">${it.text.length} 字</span></div></div>`
+      : `<div class="draft"><div class="card" style="padding:10px 12px;background:#000">${esc(it.draft)}</div></div>`
+    return `<div class="item" role="listitem" data-i="${i}" data-focus="${i === focus}" data-action="${it.action}">
+      <div class="item-head" data-pick="${i}">
+        <span class="num tabular">${i + 1}</span>
+        <span class="who">${esc(it.who)}</span>
+        <span class="subj">${esc(it.subj)}</span>
+        <span class="status" data-s="${s}" data-status="${i}">${label}</span>
+      </div>
+      <div class="excerpt">${esc(it.excerpt)}</div>
+      ${draft}
+      <div class="acts" role="group" aria-label="第 ${i + 1} ${v.noun}怎麼處理">
+        <button type="button" data-act="approve" data-i="${i}" aria-pressed="${it.action === 'approve'}">${v.editable ? '採用' : '照建議'}<kbd>A</kbd></button>
+        <button type="button" data-act="skip" data-i="${i}" aria-pressed="${it.action === 'skip'}">不處理<kbd>X</kbd></button>
+        <button type="button" data-act="revise" data-i="${i}" aria-pressed="${it.action === 'revise'}">請 AI 改<kbd>R</kbd></button>
+      </div>
+      <div class="note"><input data-note="${i}" value="${esc(it.note)}" placeholder="跟 AI 說這${v.noun}要怎麼改（例如：先道歉再說明）"></div>
+    </div>`
+  }).join('')
+  list.querySelectorAll('textarea').forEach(grow)
+}
+
+function grow(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px' }
+
+function renderOriginal() {
+  const it = items[focus]
+  const v = VARIANTS[variant]
+  document.getElementById('original').innerHTML = `
+    <div class="label">${v.editable ? '原文' : '申請內容'} · 第 ${focus + 1} ${v.noun}（共 ${items.length} ${v.noun}）</div>
+    <div class="mail-head"><span class="from">${esc(it.who)}</span><span class="muted">${esc(it.subj)}</span></div>
+    <div class="mail-body">${esc(it.body)}</div>
+    <div class="thread-note">左欄跟著右邊選中的項目切換；按 J／K 換下一${v.noun}。</div>`
+}
+
+function counts() {
+  const c = { approve: 0, edited: 0, skip: 0, revise: 0 }
+  items.forEach((it) => c[statusOf(it)[0]]++)
+  return c
+}
+
+function renderSummary() {
+  const v = VARIANTS[variant]
+  const c = counts()
+  const sendN = c.approve + c.edited
+  const parts = [`${v.verbApprove} ${sendN} ${v.noun}`]
+  if (c.edited) parts.push(`其中 ${c.edited} ${v.noun}你改過`)
+  if (c.skip) parts.push(`不處理 ${c.skip}`)
+  if (c.revise) parts.push(`請 AI 改 ${c.revise}`)
+  document.getElementById('summary').innerHTML = parts.map((p) => `<span>${p}</span>`).join('')
+  const reviseMissing = items.some((it) => it.action === 'revise' && !it.note.trim())
+  const send = document.getElementById('send')
+  send.disabled = reviseMissing
+  send.title = reviseMissing ? '「請 AI 改」的項目要寫一句怎麼改' : ''
+  document.getElementById('bulk-hint').textContent = reviseMissing ? '「請 AI 改」的項目要寫一句怎麼改' : '逐項改完再送，或一鍵處理全部'
+}
+
+function setAction(i, action) {
+  items[i].action = items[i].action === action && action !== 'approve' ? 'approve' : action
+  focus = i
+  renderList(); renderOriginal(); renderSummary()
+  if (items[i].action === 'revise') document.querySelector(`[data-note="${i}"]`)?.focus()
+}
+
+function submit(mode, instruction) {
+  const v = VARIANTS[variant]
+  submitted = true
+  const decide = document.getElementById('decide')
+  const rows = items.map((it, i) => {
+    const s = mode === 'redo' ? ['revise', '請 AI 改'] : statusOf(it)
+    return `<li><span class="num tabular">${i + 1}</span><span>${esc(it.who)}</span><span class="status" data-s="${s[0]}">${s[1]}</span></li>`
+  }).join('')
+  const c = counts()
+  const lines = mode === 'redo'
+    ? [`全部退回，AI 會依你的指示重寫：「${esc(instruction)}」`, `改好後會以「第 2 輪」再送來給你看`]
+    : [`AI 會用你確認的文字逐${v.noun}${v.verbApprove}（${c.approve + c.edited} ${v.noun}），一字不改`, ...(c.revise ? [`請 AI 改的 ${c.revise} ${v.noun}改好後會以「第 2 輪」再送來`] : []), ...(c.skip ? [`不處理的 ${c.skip} ${v.noun}會封存，不回覆`] : [])]
+  decide.innerHTML = `<div class="decide-top"><div class="eyebrow">已送出 · 題組</div><h1>${esc(v.title)}</h1></div>
+    <div class="receipt">
+      <div class="rc"><i>✓</i><span>已收到，已寫入決策帳本</span></div>
+      ${lines.map((l) => `<div class="rc"><i>✓</i><span>${l}</span></div>`).join('')}
+      <div class="card"><div class="label">每一項的決定</div><ol class="rc-list">${rows}</ol></div>
+      <div class="rc"><span class="muted">AI 做完會在這裡回報結果；你也可以打開原對話。</span></div>
+      <div><button type="button" class="send" onclick="location.reload()">重新看一次原型</button></div>
+    </div>`
+}
+
+document.getElementById('list').addEventListener('input', (e) => {
+  const t = e.target
+  if (t.matches('textarea[data-i]')) {
+    const i = Number(t.dataset.i)
+    items[i].text = t.value
+    if (items[i].action === 'skip') items[i].action = 'approve'
+    grow(t)
+    const [s, label] = statusOf(items[i])
+    const st = document.querySelector(`[data-status="${i}"]`)
+    st.dataset.s = s; st.textContent = label
+    t.closest('.draft').querySelector('.draft-meta').innerHTML = `<span>${items[i].text !== items[i].draft ? '已修改 · <a href="#" data-reset="' + i + '" style="color:inherit">還原 AI 版本</a>' : 'AI 草稿'}</span><span class="tabular">${items[i].text.length} 字</span>`
+    renderSummary()
+  }
+  if (t.matches('input[data-note]')) { items[Number(t.dataset.note)].note = t.value; renderSummary() }
+})
+document.getElementById('list').addEventListener('focusin', (e) => {
+  const item = e.target.closest('.item')
+  if (!item) return
+  const i = Number(item.dataset.i)
+  if (i !== focus) { focus = i; document.querySelectorAll('.item').forEach((el) => (el.dataset.focus = String(Number(el.dataset.i) === i))); renderOriginal() }
+})
+document.getElementById('list').addEventListener('click', (e) => {
+  const act = e.target.closest('[data-act]')
+  if (act) return setAction(Number(act.dataset.i), act.dataset.act)
+  const reset = e.target.closest('[data-reset]')
+  if (reset) { e.preventDefault(); const i = Number(reset.dataset.reset); items[i].text = items[i].draft; renderList(); renderSummary(); return }
+  const pick = e.target.closest('[data-pick]')
+  if (pick) { focus = Number(pick.dataset.pick); document.querySelectorAll('.item').forEach((el) => (el.dataset.focus = String(Number(el.dataset.i) === focus))); renderOriginal() }
+})
+document.getElementById('approve-all').addEventListener('click', () => {
+  items.forEach((it) => { if (it.action !== 'skip') it.action = 'approve'; it.note = '' })
+  renderList(); renderSummary()
+})
+document.getElementById('redo-all').addEventListener('click', () => { document.getElementById('redo').dataset.open = 'true'; document.getElementById('redo-text').focus() })
+document.getElementById('redo-cancel').addEventListener('click', () => { document.getElementById('redo').dataset.open = 'false' })
+document.getElementById('redo-send').addEventListener('click', () => {
+  const text = document.getElementById('redo-text').value.trim()
+  if (!text) { document.getElementById('redo-text').focus(); return }
+  submit('redo', text)
+})
+document.getElementById('send').addEventListener('click', () => submit('send'))
+document.querySelector('.proto-bar').addEventListener('click', (e) => {
+  const b = e.target.closest('button')
+  if (!b) return
+  if (b.dataset.page === 'others') {
+    const on = b.getAttribute('aria-pressed') !== 'true'
+    b.setAttribute('aria-pressed', String(on))
+    document.getElementById('gallery').dataset.on = String(on)
+    document.getElementById('body').style.display = on ? 'none' : ''
+    return
+  }
+  if (b.dataset.variant) {
+    document.querySelectorAll('[data-variant]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    document.getElementById('gallery').dataset.on = 'false'
+    document.querySelector('[data-page="others"]').setAttribute('aria-pressed', 'false')
+    document.getElementById('body').style.display = ''
+    location.hash = b.dataset.variant
+    if (submitted) { location.reload(); return }
+    load(b.dataset.variant)
+  }
+})
+document.addEventListener('keydown', (e) => {
+  if (submitted) return
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('send').disabled) submit('send'); return }
+  const typing = e.target.matches('textarea, input')
+  if (e.key === 'Escape' && typing) { e.target.blur(); return }
+  if (typing) return
+  const k = e.key.toLowerCase()
+  if (k === 'j' || e.key === 'ArrowDown') { focus = Math.min(items.length - 1, focus + 1) }
+  else if (k === 'k' || e.key === 'ArrowUp') { focus = Math.max(0, focus - 1) }
+  else if (k === 'a') return setAction(focus, 'approve')
+  else if (k === 'x') return setAction(focus, 'skip')
+  else if (k === 'r') return setAction(focus, 'revise')
+  else if (k === 'e') { document.querySelector(`textarea[data-i="${focus}"]`)?.focus(); e.preventDefault(); return }
+  else return
+  e.preventDefault()
+  document.querySelectorAll('.item').forEach((el) => (el.dataset.focus = String(Number(el.dataset.i) === focus)))
+  document.querySelector(`.item[data-i="${focus}"]`)?.scrollIntoView({ block: 'nearest' })
+  renderOriginal()
+})
+
+// 其他題型草圖
+const multi = ['素材 A：學員成果影片', '素材 B：價格比較圖', '素材 C：老師口播 15 秒', '素材 D：課程大綱輪播', '素材 E：限時優惠倒數']
+const multiOn = new Set([0, 2])
+function renderMulti() {
+  document.getElementById('multi').innerHTML = multi.map((m, i) => `<div class="opt" data-on="${multiOn.has(i)}" data-m="${i}" role="checkbox" aria-checked="${multiOn.has(i)}" tabindex="0"><span class="box">${multiOn.has(i) ? '✓' : ''}</span><span>${m}</span></div>`).join('')
+  document.getElementById('multi-count').textContent = multiOn.size
+}
+document.getElementById('multi').addEventListener('click', (e) => { const o = e.target.closest('[data-m]'); if (!o) return; const i = Number(o.dataset.m); if (multiOn.has(i)) multiOn.delete(i); else if (multiOn.size < 5) multiOn.add(i); renderMulti() })
+const rank = ['把 Kunsu 的題組做完', '回覆投資人', '錄 Podcast', '整理下季課程大綱']
+function renderRank() {
+  document.getElementById('rank').innerHTML = rank.map((r, i) => `<div class="opt" data-r="${i}"><span class="num tabular">${i + 1}</span><span style="flex:1">${r}</span><button type="button" data-up="${i}" style="border:0;background:transparent;color:var(--ink-3);cursor:pointer" aria-label="往上">↑</button><button type="button" data-down="${i}" style="border:0;background:transparent;color:var(--ink-3);cursor:pointer" aria-label="往下">↓</button><span class="grip" aria-hidden="true">⋮⋮</span></div>`).join('')
+}
+document.getElementById('rank').addEventListener('click', (e) => {
+  const up = e.target.closest('[data-up]'); const down = e.target.closest('[data-down]')
+  const swap = (a, b) => { if (b < 0 || b >= rank.length) return; [rank[a], rank[b]] = [rank[b], rank[a]]; renderRank() }
+  if (up) swap(Number(up.dataset.up), Number(up.dataset.up) - 1)
+  if (down) swap(Number(down.dataset.down), Number(down.dataset.down) + 1)
+})
+document.getElementById('price').addEventListener('input', (e) => { document.getElementById('price-v').textContent = 'NT$' + Number(e.target.value).toLocaleString('en-US') })
+const slots = ['週二 14:00', '週二 16:00', '週三 10:00', '週四 14:00', '週四 16:00', '週五 10:00']
+document.getElementById('slots').innerHTML = slots.map((s, i) => `<button type="button" aria-pressed="${i === 3}">${s}</button>`).join('')
+document.getElementById('slots').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#slots button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))) })
+renderMulti(); renderRank()
+
+load(VARIANTS[location.hash.slice(1)] ? location.hash.slice(1) : 'email')
+</script>
+</body>
+</html>

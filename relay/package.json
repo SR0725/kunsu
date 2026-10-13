@@ -1,0 +1,20 @@
+{
+  "name": "kunsu-cloud",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Kunsu 帳號服務與中轉站：雲端只存帳號與裝置清單，中轉站只轉端對端加密的封包（docs/design/accounts.md、mobile-relay.md）",
+  "type": "module",
+  "main": "main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node main.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "jose": "6.1.0",
+    "pg": "8.13.1",
+    "ws": "8.18.0"
+  }
+}

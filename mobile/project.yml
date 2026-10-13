@@ -1,0 +1,33 @@
+name: KunsuMobile
+options:
+  developmentLanguage: zh-Hant
+  bundleIdPrefix: com.rayrealms.kunsu
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  KunsuMobile:
+    type: application
+    platform: iOS
+    sources:
+      - KunsuMobile
+      - path: KunsuCore/Sources/KunsuCore
+        group: KunsuCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rayrealms.kunsu.mobile
+        INFOPLIST_KEY_CFBundleDisplayName: 軍師
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: 用相機掃電腦上的配對 QR code
+        DEVELOPMENT_TEAM: J9Z63W9C42
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools

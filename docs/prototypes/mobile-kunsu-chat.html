@@ -1,0 +1,701 @@
+<title>軍師對話介面發散</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: concept switcher on top; a phone frame on the left, the concept's reasoning on the right (stacked on phones). */
+:root {
+  color-scheme: dark;
+  --canvas: #000000;
+  --page: #060708;
+  --card: #0b0c0e;
+  --raised: #15171b;
+  --line: #1f2228;
+  --strong: #f2f3f5;
+  --body: #c3c7ce;
+  --muted: #8b919b;
+  --faint: #5f6570;
+  --waiting: #d9b26a;
+  --danger: #ef8d86;
+  --ok: #83c494;
+  --accent: #3987e5;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Helvetica Neue", sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--page); color: var(--body); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input { font: inherit; }
+
+.top { padding-inline: 16px; padding-block: 16px 12px; max-width: 1120px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.top h1 { margin: 0; font-size: 17px; color: var(--strong); font-weight: 700; letter-spacing: .02em; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--body); font-size: 14px; background: var(--card); }
+.tabs button[aria-pressed="true"] { background: var(--strong); color: #000; border-color: var(--strong); font-weight: 700; }
+.tabs .n { font-family: var(--mono); font-size: 12px; opacity: .7; margin-right: 6px; }
+.reset { margin-left: auto; color: var(--muted); font-size: 13px; padding: 6px 10px; border-radius: 8px; }
+.reset:hover { color: var(--strong); background: var(--card); }
+
+.stage { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 0 32px; display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 40px; align-items: start; }
+.phone { position: relative; width: 392px; height: min(840px, calc(100vh - 96px)); min-height: 620px; border-radius: 46px; border: 1px solid #23262c; background: var(--canvas); overflow: hidden; box-shadow: 0 30px 80px rgb(0 0 0 / .6), inset 0 0 0 6px #0c0d10; }
+.notes { padding-top: 8px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; color: var(--strong); font-size: 24px; line-height: 1.25; text-wrap: balance; }
+.notes .one { color: var(--body); font-size: 16px; margin: 0 0 20px; }
+.notes h3 { margin: 22px 0 8px; font-size: 12px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.notes li { line-height: 1.6; }
+.notes .try { margin-top: 24px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.notes .try b { color: var(--strong); }
+
+@media (max-width: 860px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-inline: 0; }
+  .phone { width: 100%; height: calc(100dvh - 110px); min-height: 560px; border-radius: 0; border: 0; box-shadow: none; }
+  .notes { padding-inline: 16px; }
+  .reset { margin-left: 0; }
+}
+
+/* ---------- phone internals ---------- */
+.scr { position: absolute; inset: 0; display: flex; flex-direction: column; color: var(--body); }
+.sbar { height: 46px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0; font: 600 15px var(--sans); color: var(--strong); }
+.sbar i { display: inline-block; width: 24px; height: 11px; border: 1.5px solid var(--strong); border-radius: 3px; position: relative; }
+.sbar i::after { content: ""; position: absolute; inset: 1.5px 6px 1.5px 1.5px; background: var(--strong); border-radius: 1px; }
+@media (max-width: 860px) { .sbar { display: none; } }
+
+.hdr { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px 10px; min-height: 52px; border-bottom: 1px solid var(--line); }
+.hdr .t { color: var(--strong); font-weight: 700; font-size: 17px; }
+.hdr .sub { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.hdr .sp { flex: 1; }
+.back { display: flex; align-items: center; gap: 2px; color: var(--strong); font-size: 16px; min-height: 44px; padding-right: 6px; }
+.big { font-size: 30px; font-weight: 700; color: var(--strong); padding: 4px 16px 6px; }
+.conn { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.conn::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.body { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.body::-webkit-scrollbar { display: none; }
+.pad { padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+.mark { flex: none; display: inline-block; vertical-align: middle; }
+.lbl { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+.meta { font-size: 13px; color: var(--muted); }
+.mono { font-family: var(--mono); }
+.wait { color: var(--waiting); }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); color: var(--strong); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.chip.on { background: var(--strong); color: #000; border-color: var(--strong); }
+.chip.ghost { background: transparent; color: var(--muted); }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.chips::-webkit-scrollbar { display: none; }
+.pill { min-height: 52px; width: 100%; border-radius: 999px; background: var(--strong); color: #000; font-weight: 700; font-size: 16px; }
+.pill[disabled] { opacity: .35; cursor: default; }
+.rec { font-size: 11px; font-weight: 700; color: var(--accent); background: rgb(57 135 229 / .15); padding: 2px 6px; border-radius: 999px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.cmd { font-family: var(--mono); font-size: 14px; color: var(--strong); background: var(--canvas); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+
+.composer { flex: none; border-top: 1px solid var(--line); padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--canvas); }
+.inrow { display: flex; gap: 8px; align-items: center; }
+.inrow input { flex: 1; min-width: 0; height: 44px; border-radius: 22px; border: 1px solid var(--line); background: var(--raised); color: var(--strong); padding: 0 16px; }
+.inrow input::placeholder { color: var(--faint); }
+.send { width: 44px; height: 44px; border-radius: 50%; background: var(--strong); color: #000; font-weight: 800; flex: none; font-size: 18px; }
+
+.me { align-self: flex-end; max-width: 82%; background: var(--raised); color: var(--strong); padding: 9px 14px; border-radius: 18px 18px 6px 18px; white-space: pre-wrap; }
+.ai { max-width: 92%; color: var(--body); white-space: pre-wrap; line-height: 1.6; }
+.tool { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.sys { align-self: center; font-size: 12px; color: var(--muted); text-align: center; }
+
+.row { display: flex; gap: 12px; padding: 12px 16px; align-items: flex-start; border-bottom: 1px solid var(--line); text-align: left; width: 100%; }
+.row .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row .nm { color: var(--strong); font-weight: 700; font-size: 16px; }
+.row .pv { color: var(--body); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row .rt { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgb(217 178 106 / .14); color: var(--waiting); white-space: nowrap; }
+.tag.run { background: rgb(57 135 229 / .14); color: var(--accent); }
+.tag.idle { background: var(--raised); color: var(--muted); }
+
+/* inline keyboard under a bubble (Telegram style) */
+.kb { display: grid; gap: 6px; margin-top: 8px; }
+.kb button { min-height: 44px; border-radius: 12px; background: var(--raised); border: 1px solid var(--line); color: var(--strong); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
+.kb button.primary { background: var(--strong); color: #000; border-color: var(--strong); }
+.qbub { background: var(--card); border: 1px solid var(--line); border-radius: 18px 18px 18px 6px; padding: 12px 14px; max-width: 92%; }
+.qbub .q { color: var(--strong); font-weight: 700; font-size: 16px; line-height: 1.45; }
+
+/* toast + sheets */
+.toast { position: absolute; left: 12px; right: 12px; top: 52px; z-index: 30; background: var(--raised); border: 1px solid #2b2f37; border-radius: 16px; padding: 10px 12px 12px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .5); }
+@media (max-width: 860px) { .toast { top: 8px; } }
+.toast .tx { flex: 1; min-width: 0; }
+.toast .tx b { color: var(--strong); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast .tx span { font-size: 12px; color: var(--muted); }
+.toast .bar { position: absolute; left: 14px; right: 14px; bottom: 5px; height: 2px; background: var(--muted); border-radius: 2px; transform-origin: left; animation: drain 5s linear forwards; }
+@keyframes drain { to { transform: scaleX(0); } }
+.toast button { color: var(--strong); font-weight: 800; min-height: 44px; padding: 0 8px; }
+.sheet-bg { position: absolute; inset: 0; z-index: 40; background: rgb(0 0 0 / .55); display: flex; align-items: flex-end; }
+.sheet { width: 100%; max-height: 92%; background: var(--canvas); border-top: 1px solid var(--line); border-radius: 26px 26px 0 0; display: flex; flex-direction: column; animation: up .22s ease-out; }
+@keyframes up { from { transform: translateY(30px); opacity: 0; } }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: #3a3e46; margin: 8px auto 2px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); width: 100%; }
+.opt .k { width: 28px; height: 28px; border-radius: 8px; background: var(--raised); color: var(--body); font: 700 14px var(--mono); display: grid; place-items: center; flex: none; }
+.opt[aria-checked="true"] { border: 2px solid var(--strong); padding: 13px; }
+.opt[aria-checked="true"] .k { background: var(--strong); color: #000; }
+.opt .l { color: var(--strong); font-weight: 700; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.opt .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.sign { border: 1px solid rgb(217 178 106 / .45); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; background: var(--card); }
+.sign div { display: flex; justify-content: space-between; gap: 12px; }
+.sign span:first-child { color: var(--muted); }
+.sign span:last-child { color: var(--strong); text-align: right; font-variant-numeric: tabular-nums; }
+.face { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgb(0 0 0 / .35); }
+.face div { background: rgb(40 42 48 / .92); border-radius: 22px; padding: 26px 30px; text-align: center; color: var(--strong); font-size: 13px; }
+.face svg { display: block; margin: 0 auto 10px; }
+
+/* focus concept */
+.dots { display: flex; gap: 5px; }
+.dots i { width: 18px; height: 4px; border-radius: 2px; background: var(--line); }
+.dots i.on { background: var(--strong); }
+.dots i.done { background: var(--muted); }
+.slide { animation: slide .24s ease-out; }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+.fq { color: var(--strong); font-size: 24px; font-weight: 700; line-height: 1.35; text-wrap: balance; }
+.ctx { border-left: 3px solid var(--line); padding-left: 12px; display: grid; gap: 6px; }
+
+/* bottom tab bar */
+.tabbar { flex: none; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); padding-bottom: 14px; background: var(--canvas); }
+.tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 8px; color: var(--muted); font-size: 11px; font-weight: 600; min-height: 52px; position: relative; }
+.tabbar button[aria-current="page"] { color: var(--strong); }
+.badge { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #000; font: 700 11px/18px var(--mono); }
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgb(217 178 106 / .1); border: 1px solid rgb(217 178 106 / .3); color: var(--waiting); font-size: 14px; text-align: left; width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide, .sheet, .toast .bar { animation: none; }
+}
+</style>
+
+<div class="top">
+  <h1>軍師一問一答 · 五種變化</h1>
+  <nav class="tabs" id="tabs" aria-label="介面"></nav>
+  <button class="reset" id="reopen" type="button" style="margin-left:auto;color:var(--strong);border:1px solid var(--line)">模擬重新打開 App</button>
+  <button class="reset" id="reset" type="button" style="margin-left:0">重設假資料</button>
+</div>
+<div class="stage">
+  <div class="phone" id="phone" aria-live="polite"></div>
+  <aside class="notes" id="notes"></aside>
+</div>
+
+<script>
+const CLAUDE_D = "M52.4285 162.873L98.7844 136.879L99.5485 134.602L98.7844 133.334H96.4921L88.7237 132.862L62.2346 132.153L39.3113 131.207L17.0249 130.026L11.4214 128.844L6.2 121.873L6.7094 118.447L11.4214 115.257L18.171 115.847L33.0711 116.911L55.485 118.447L71.6586 119.392L95.728 121.873H99.5485L100.058 120.337L98.7844 119.392L97.7656 118.447L74.5877 102.732L49.4995 86.1905L36.3823 76.62L29.3779 71.7757L25.8121 67.2858L24.2839 57.3608L30.6515 50.2716L39.3113 50.8623L41.4763 51.4531L50.2636 58.1879L68.9842 72.7209L93.4357 90.6804L97.0015 93.6343L98.4374 92.6652L98.6571 91.9801L97.0015 89.2625L83.757 65.2772L69.621 40.8192L63.2534 30.6579L61.5978 24.632C60.9565 22.1032 60.579 20.0111 60.579 17.4246L67.8381 7.49965L71.9133 6.19995L81.7193 7.49965L85.7946 11.0443L91.9074 24.9865L101.714 46.8451L116.996 76.62L121.453 85.4816L123.873 93.6343L124.764 96.1155H126.292V94.6976L127.566 77.9197L129.858 57.3608L132.15 30.8942L132.915 23.4505L136.608 14.4708L143.994 9.62643L149.725 12.344L154.437 19.0788L153.8 23.4505L150.998 41.6463L145.522 70.1215L141.957 89.2625H143.994L146.414 86.7813L156.093 74.0206L172.266 53.698L179.398 45.6635L187.803 36.802L193.152 32.5484H203.34L210.726 43.6549L207.415 55.1159L196.972 68.3492L188.312 79.5739L175.896 96.2095L168.191 109.585L168.882 110.689L170.738 110.53L198.755 104.504L213.91 101.787L231.994 98.7149L240.144 102.496L241.036 106.395L237.852 114.311L218.495 119.037L195.826 123.645L162.07 131.592L161.696 131.893L162.137 132.547L177.36 133.925L183.855 134.279H199.774L229.447 136.524L237.215 141.605L241.8 147.867L241.036 152.711L229.065 158.737L213.019 154.956L175.45 145.977L162.587 142.787H160.805V143.85L171.502 154.366L191.242 172.089L215.82 195.011L217.094 200.682L213.91 205.172L210.599 204.699L188.949 188.394L180.544 181.069L161.696 165.118H160.422V166.772L164.752 173.152L187.803 207.771L188.949 218.405L187.294 221.832L181.308 223.959L174.813 222.777L161.187 203.754L147.305 182.486L136.098 163.345L134.745 164.2L128.075 235.42L125.019 239.082L117.887 241.8L111.902 237.31L108.718 229.984L111.902 215.452L115.722 196.547L118.779 181.541L121.58 162.873L123.291 156.636L123.14 156.219L121.773 156.449L107.699 175.752L86.304 204.699L69.3663 222.777L65.291 224.431L58.2867 220.768L58.9235 214.27L62.8713 208.48L86.304 178.705L100.44 160.155L109.551 149.507L109.462 147.967L108.959 147.924L46.6977 188.512L35.6182 189.93L30.7788 185.44L31.4156 178.115L33.7079 175.752L52.4285 162.873Z";
+const CODEX_LOBES = Array.from({ length: 8 }, (_, i) => {
+  const a = i / 8 * Math.PI * 2 + Math.PI / 8;
+  return `<circle cx="${(12 + Math.cos(a) * 6.2).toFixed(2)}" cy="${(12 + Math.sin(a) * 6.2).toFixed(2)}" r="4.6"/>`;
+}).join("");
+let gid = 0;
+function mark(agent, size = 20) {
+  if (agent === "claude") return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 248 248" role="img" aria-label="Claude"><path fill="#D97757" d="${CLAUDE_D}"/></svg>`;
+  if (agent === "codex") {
+    const id = "cg" + (gid++);
+    return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" role="img" aria-label="Codex"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a8f6"/><stop offset=".5" stop-color="#6c78f5"/><stop offset="1" stop-color="#3430ef"/></linearGradient></defs><g fill="url(#${id})">${CODEX_LOBES}<circle cx="12" cy="12" r="7.2"/></g><path d="M8.4 9.2 L10.9 12 L8.4 14.8 M12.6 14.8 H16" fill="none" stroke="#f2f3ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" role="img" aria-label="軍師"><rect x="1" y="1" width="22" height="22" rx="6" fill="#1a1c21" stroke="#3a3e46"/><path d="M8 6v12M8 12l6-6M10 10l5 8" stroke="#f2f3f5" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const AGENT = { claude: "Claude", codex: "Codex" };
+
+/* ---------------- mock data（同一份給四個版本） ---------------- */
+const BASE = {
+  sessions: {
+    kunsu: { id: "kunsu", agent: "codex", branch: "main", status: "reply", time: "23:40",
+      turns: [
+        { u: "外接螢幕上拖邊緣瀏海會跳一下，幫我修" },
+        { a: "我先看 drag 的 hysteresis 跟 grab offset 怎麼算。" },
+        { t: "讀了 4 個檔 · 搜尋 2 次" },
+        { a: "找到了：換螢幕時 grab offset 用的是舊螢幕的座標，第一幀就會跳。我改成在換 stage 時重新量。" },
+        { t: "改了 3 個檔 · 跑了測試 ✓" },
+        { a: "測試全綠了。要我直接 commit 並跑 build-install 嗎？\nA. commit 並安裝\nB. 先給我看 diff" },
+      ], quick: ["A", "B", "繼續"] },
+    threads: { id: "threads", name: "blog-site", agent: "claude", branch: "feat/tracker", status: "perm", time: "23:36",
+      turns: [
+        { u: "tracker 修好就推上去" },
+        { t: "改了 2 個檔 · 跑了測試 ✓" },
+        { a: "修好了，測試通過。接下來要推到遠端。" },
+      ], perm: { cmd: "git push origin feat/tracker", why: "把 tracker 修正推到遠端分支", risk: true } },
+    ads: { id: "ads", name: "ads-review", agent: "claude", branch: "main", status: "run", run: "跑報表中", time: "23:39",
+      turns: [
+        { u: "每晚復盤：看 Meta 三個課程廣告組" },
+        { t: "抓了 3 份報表" },
+        { a: "「課程早鳥」CPA 從 NT$268 漲到 NT$412，我丟了一題問你要不要降預算。其他兩組正常，我繼續看素材疲勞。" },
+      ] },
+    demo-shop: { id: "demo-shop", agent: "codex", branch: "main", status: "idle", time: "21:12",
+      turns: [{ u: "landing page hero 改成新文案" }, { a: "改好了，已部署到 Zeabur 預覽環境。" }] },
+    vault: { id: "vault", name: "notes", agent: "claude", branch: "main", status: "idle", time: "昨天",
+      turns: [{ u: "整理這週的決策紀錄" }, { a: "整理好了，寫在 me/decisions/2026-W41.md。" }] },
+  },
+  decisions: [
+    { id: "notch", agent: "codex", session: "kunsu", project: "kunsu", time: "23:31",
+      q: "邊緣瀏海拖到角落附近放開時，要吸附成 L 形，還是滑回直邊？",
+      why: "決定後 Codex 會照這個改 BDD 和測試，大約 20 分鐘。",
+      opts: [{ l: "吸附成 L 形", d: "距離角落 30% 以內就吸附，跟現在桌面一致", rec: true }, { l: "滑回直邊", d: "永遠停在直邊，留 24 px 間距" }] },
+    { id: "budget", agent: "claude", session: "ads", project: "ads-review", time: "23:18",
+      q: "「課程早鳥」CPA 漲到 NT$412，要把日預算降到 NT$800 嗎？",
+      why: "不處理的話今晚到明早大約再花 NT$1,100，預估多 2–3 筆轉換。",
+      money: [["廣告組", "課程早鳥｜再行銷 30 天"], ["目前日預算", "NT$1,500"], ["改為", "NT$800"]],
+      opts: [{ l: "降到 NT$800", d: "立刻生效，學習期不重置", rec: true }, { l: "先不動", d: "明早復盤再決定" }] },
+    { id: "news", agent: "claude", session: null, project: "blog", time: "22:57",
+      q: "這期電子報要今晚 21:00 寄，還是明早 08:00？",
+      why: "排程後 Claude 會直接在 Ghost 設定寄送時間。",
+      opts: [{ l: "明早 08:00", d: "過去 8 期早上開信率高 6%", rec: true }, { l: "今晚 21:00" }] },
+  ],
+};
+const nameOf = s => s.name || s.id;
+const REPLY = "好，這步處理完了。下一步要做什麼？\nA. 跑完整測試\nB. 先停在這裡";
+
+let S, concept = "messages", timers = [];
+function fresh() {
+  timers.forEach(clearTimeout); timers = [];
+  S = structuredClone(BASE);
+  S.ui = {}; S.toast = null; S.sheet = null; S.face = false;
+  S.chat = []; S.skipped = []; S.flow = null;
+}
+const later = (ms, fn) => timers.push(setTimeout(() => { fn(); render(); }, ms));
+
+/* ---------------- 共用動作 ---------------- */
+function queue(label, apply, revert, commit) {
+  if (S.toast) { clearTimeout(S.toast.timer); S.toast.commit(); }
+  apply();
+  const t = { label, revert, commit };
+  t.timer = setTimeout(() => { if (S.toast === t) { S.toast = null; commit(); render(); } }, 5000);
+  S.toast = t;
+  render();
+}
+function undo() {
+  const t = S.toast; if (!t) return;
+  clearTimeout(t.timer); S.toast = null; t.revert(); render();
+}
+function resume(sid) {
+  const s = S.sessions[sid]; if (!s) return;
+  s.status = "run"; s.run = "處理中"; s.time = "剛剛"; render();
+  later(2200, () => { s.turns.push({ t: "讀了 3 個檔 · 改了 1 個檔" }, { a: REPLY }); s.status = "reply"; s.quick = ["A", "B", "繼續"]; onNewItem(); });
+}
+function onNewItem() { if (concept === "kunsu") askNext(true); }
+
+function answer(did, idx, confirmed) {
+  const i = S.decisions.findIndex(d => d.id === did); if (i < 0) return;
+  const d = S.decisions[i];
+  if (d.money && !confirmed) { S.sheet = { kind: "decision", id: did, sel: null }; render(); return; }
+  if (d.money && d.opts[idx].rec) {
+    S.face = true; render();
+    later(800, () => {
+      S.face = false; S.decisions.splice(i, 1);
+      S.sheet = { kind: "receipt", label: d.opts[idx].l };
+      afterDecision(d, d.opts[idx].l);
+    });
+    return;
+  }
+  S.sheet = null;
+  const before = snap();
+  queue(`「${d.opts[idx].l}」`, () => { S.decisions.splice(i, 1); afterDecision(d, d.opts[idx].l); },
+    () => restore(before), () => { if (d.session) resume(d.session); });
+}
+function send(sid, text) {
+  const s = S.sessions[sid]; if (!s || !text) return;
+  const before = snap();
+  queue(`「${text}」→ ${nameOf(s)}`, () => { s.turns.push({ u: text }); s.status = "run"; s.run = "等你撤回時間結束"; afterSend(s, text); },
+    () => restore(before), () => resume(sid));
+}
+function permit(sid, allow) {
+  const s = S.sessions[sid]; if (!s || !s.perm) return;
+  const go = () => {
+    s.turns.push({ sys: `你${allow ? "允許" : "拒絕"}了 ${s.perm.cmd}` });
+    const cmd = s.perm.cmd; delete s.perm;
+    afterPermit(s, allow, cmd);
+    if (allow) { s.status = "run"; s.run = "推送中"; later(1800, () => { s.turns.push({ t: `執行了 ${cmd} ✓` }, { a: "推上去了。要開 PR 嗎？\nA. 開 PR\nB. 先不用" }); s.status = "reply"; s.quick = ["A", "B"]; onNewItem(); }); }
+    else { s.turns.push({ a: "好，不推。要我先整理成草稿 PR 嗎？" }); s.status = "reply"; s.quick = ["好", "不用"]; }
+    render();
+  };
+  if (allow && s.perm.risk) { S.face = true; render(); later(800, () => { S.face = false; go(); }); }
+  else go();
+}
+// 每個版本自己的副作用（寫歷史、跳下一件……）
+let afterDecision = () => {}, afterSend = () => {}, afterPermit = () => {};
+function snap() { return JSON.stringify({ sessions: S.sessions, decisions: S.decisions, chat: S.chat, skipped: S.skipped, ui: S.ui, flow: S.flow }); }
+function restore(j) { Object.assign(S, JSON.parse(j)); }
+
+/* 需要你的事，越急越前面：決定 > 批准 > 回話 */
+function items() {
+  const out = [];
+  S.decisions.forEach(d => out.push({ kind: "decision", id: "d:" + d.id, d }));
+  Object.values(S.sessions).filter(s => s.status === "perm" && s.perm).forEach(s => out.push({ kind: "perm", id: "p:" + s.id, s }));
+  Object.values(S.sessions).filter(s => s.status === "reply").forEach(s => out.push({ kind: "reply", id: "r:" + s.id, s }));
+  const skip = S.skipped;
+  return out.sort((a, b) => skip.indexOf(a.id) - skip.indexOf(b.id));
+}
+const running = () => Object.values(S.sessions).filter(s => s.status === "run");
+
+/* ---------------- 共用畫面片段 ---------------- */
+function turnsHTML(s) {
+  return s.turns.map(t =>
+    t.u ? `<div class="me">${esc(t.u)}</div>` :
+    t.a ? `<div class="ai">${esc(t.a)}</div>` :
+    t.t ? `<div class="tool">⚙︎ ${esc(t.t)}</div>` :
+    `<div class="sys">${esc(t.sys)}</div>`).join("");
+}
+function overlays() {
+  let h = "";
+  if (S.toast) h += `<div class="toast" role="status"><div class="tx"><b>已送出${esc(S.toast.label)}</b><span>5 秒內可撤回，撤回前不會送到 Mac</span></div><button data-a="undo">撤回</button><div class="bar"></div></div>`;
+  if (S.sheet) h += sheetHTML();
+  if (S.face) h += `<div class="face"><div><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#f2f3f5" stroke-width="1.3" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 16c1.5 1 3.5 1 5 0"/></svg>Face ID（模擬）</div></div>`;
+  return h;
+}
+function sheetHTML() {
+  const sh = S.sheet;
+  let inner = "";
+  if (sh.kind === "decision") {
+    const d = S.decisions.find(x => x.id === sh.id);
+    if (!d) { S.sheet = null; return ""; }
+    const label = d.money && sh.sel != null && d.opts[sh.sel].rec ? "批准並執行 · Face ID" : "送出決定";
+    inner = `<div class="hdr" style="border:0">${mark(d.agent, 22)}<div><div class="t" style="font-size:15px">${AGENT[d.agent]} · ${esc(d.project)}</div><div class="meta">${d.time}</div></div><span class="sp"></span><button class="meta" data-a="close" style="min-height:44px">稍後再問</button></div>
+      <div class="body"><div class="pad">
+        <div class="lbl">要你決定</div><div class="fq">${esc(d.q)}</div><div>${esc(d.why)}</div>
+        ${d.money ? `<div class="sign"><b class="wait" style="font-size:13px">所見即所簽</b>${d.money.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>` : ""}
+        <div role="radiogroup" style="display:grid;gap:10px">${d.opts.map((o, i) => `<button class="opt" role="radio" aria-checked="${sh.sel === i}" data-a="pick" data-i="${i}"><span class="k">${i + 1}</span><span><span class="l">${esc(o.l)}${o.rec ? '<span class="rec">AI 建議</span>' : ""}</span>${o.d ? `<div class="d">${esc(o.d)}</div>` : ""}</span></button>`).join("")}</div>
+        <div class="meta">什麼都不會預先選好，要你自己點。</div>
+      </div></div>
+      <div class="composer"><button class="pill" data-a="sheetsubmit" ${sh.sel == null ? "disabled" : ""}>${label}</button></div>`;
+  } else if (sh.kind === "receipt") {
+    inner = `<div class="pad" style="padding-top:20px"><div class="lbl" style="color:var(--ok)">✓ 已批准</div><div class="fq">${esc(sh.label)}</div>
+      <div>✓ Kunsu 已收到正式答案</div><div>✓ 已簽章，交給 executor 執行</div><div>↪ 已交給等待中的原對話</div>
+      <button class="pill" data-a="close" style="margin-top:12px">完成</button></div>`;
+  } else if (sh.kind === "transcript") {
+    const s = S.sessions[sh.id];
+    inner = `<div class="hdr">${mark(s.agent, 20)}<div><div class="t" style="font-size:15px">${esc(nameOf(s))}</div><div class="sub">${esc(s.branch)}</div></div><span class="sp"></span><button data-a="close" class="meta" style="min-height:44px">關閉</button></div>
+      <div class="body"><div class="pad">${turnsHTML(s)}</div></div>`;
+  } else if (sh.kind === "new") {
+    inner = newConvHTML(sh);
+  }
+  return `<div class="sheet-bg" data-a="bgclose"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${inner}</div></div>`;
+}
+function newConvHTML(sh) {
+  return `<div class="hdr" style="border:0"><div class="t">新對話</div><span class="sp"></span><button class="meta" data-a="close" style="min-height:44px">取消</button></div>
+  <div class="pad">
+    <div class="chips">${["claude", "codex"].map(a => `<button class="chip ${sh.agent === a ? "on" : ""}" data-a="nagent" data-v="${a}">${mark(a, 16)} ${AGENT[a]}</button>`).join("")}</div>
+    <div class="lbl">專案</div>
+    <div class="chips" style="flex-wrap:wrap">${["kunsu", "ads-review", "blog-site", "demo-shop", "notes"].map(p => `<button class="chip ${sh.project === p ? "on" : ""}" data-a="nproj" data-v="${p}">${p}</button>`).join("")}</div>
+    <div class="meta">權限：Auto（一般動作自己做，高風險才回來問你）</div>
+    <div class="inrow"><input id="newtext" placeholder="要做什麼？" autocomplete="off"><button class="send" data-a="nstart" aria-label="開始">↑</button></div>
+  </div>`;
+}
+function startNew(agent, project, text) {
+  const id = "n" + Date.now();
+  S.sessions[id] = { id, name: project, agent, branch: "main", status: "run", run: "思考中", time: "剛剛", turns: [{ u: text }] };
+  resume(id);
+  return id;
+}
+
+/* =========================================================
+   軍師一問一答：五種變化（共用同一個引擎）
+   ========================================================= */
+const HIST0 = [
+  { day: "今晚", time: "22:31", agent: "claude", project: "notes", q: "這週決策紀錄要放進 W41，還是新開一份？", a: "放進 W41", res: "AI：整理好了，寫在 me/decisions/2026-W41.md。" },
+  { day: "今晚", time: "21:05", agent: "codex", project: "demo-shop", q: "你開了新對話", a: "landing page hero 改成新文案", res: "AI：改好了，已部署到 Zeabur 預覽環境。" },
+  { day: "昨天", time: "23:50", agent: "claude", project: "ads-review", q: "「主課程」素材疲勞了，要換成新影片嗎？", a: "換成新影片", res: "AI：已上架，學習期重新開始。" },
+  { day: "昨天", time: "22:10", agent: "codex", project: "kunsu", q: "手機中轉要用 Tailscale 還是 Zeabur？", a: "Zeabur", res: "AI：已寫進 PRD §30。" },
+];
+const PENDING_RES = "交給 AI 處理中…";
+
+const VARIANTS = {
+  clean: {
+    title: "乾淨對話",
+    one: "每次打開只有這次的對話。軍師一次問一件，答完就問下一件。右上角「紀錄」看以前答過什麼。",
+    why: ["打開就是乾淨的，只有現在要處理的事。", "歷史在固定的地方（右上角），要找的時候才打開，平常不干擾。", "紀錄裡每一筆都寫：問了什麼、你怎麼答、AI 後來做了什麼。"],
+    risk: ["這次對話越聊越長時，畫面一樣會變擠。"],
+    try: "答兩件，按上方「模擬重新打開 App」，再按右上角「紀錄」找剛剛的答案。",
+    opts: { historyIcon: true },
+  },
+  focus: {
+    title: "只看眼前這件",
+    one: "處理完的事收成一行「✓ 答案 → 專案」。畫面上永遠只有現在這件是展開的。",
+    why: ["比乾淨對話更乾淨：同一次打開裡也不會越堆越長。", "收起來的那行還看得到你剛剛答了什麼，點一下就能看紀錄。", "最接近「一次一件」的專注感，但還是聊天的形式。"],
+    risk: ["軍師的「好，轉給 kunsu 了」這類回應也被收起來，對話感變弱。"],
+    try: "連續答三件，看上面收起來的那幾行，點一行看紀錄。",
+    opts: { historyIcon: true, collapse: true },
+  },
+  pull: {
+    title: "往上拉看稍早",
+    one: "歷史就在對話上方，平常收起來。點最上面的「稍早」或往上拉，才會展開以前的問答。",
+    why: ["完全照聊天軟體的習慣：要看以前的就往上捲。", "不用另一個畫面，前後文接得起來。", "打開時還是乾淨的，因為稍早的部分預設收起。"],
+    risk: ["歷史一多，往上找某一筆會很慢（沒有依專案篩選）。"],
+    try: "點最上面的「稍早」展開，再收起來。",
+    opts: { pull: true },
+  },
+  brief: {
+    title: "先報告再問",
+    one: "打開時軍師先報告：現在有幾件、大概要多久、有哪些。你按「開始」才一件一件問；全部處理完給你一份總結。",
+    why: ["先知道全局，躺著比較安心：知道還要花多久。", "可以從清單直接跳到想先處理的那件。", "最後的總結就是這次的紀錄，看完就能放下手機。"],
+    risk: ["多了「開始」這一步；只有一件事的時候顯得囉嗦。"],
+    try: "先看報告，從清單點第三件先處理，最後看總結。",
+    opts: { historyIcon: true, brief: true },
+  },
+  ask: {
+    title: "可以追問",
+    one: "每題都能先問軍師「為什麼？」或「前因後果？」，它會引用原對話的片段回答你，再決定要怎麼答。",
+    why: ["不用打開完整對話，也能補足做決定需要的脈絡。", "追問不會變成答案：只有按選項或回覆才會送出。", "紀錄可以依專案篩選，像是每段對話自己的流水帳。"],
+    risk: ["軍師的引用是摘要，真的需要逐字原文時還是要到電腦上看。"],
+    try: "在第一題按「為什麼？」和「前因後果？」，再到紀錄裡按 kunsu 篩選。",
+    opts: { historyIcon: true, ask: true },
+  },
+};
+const VORDER = ["clean", "focus", "pull", "brief", "ask"];
+let V = "clean";
+const O = () => VARIANTS[V].opts;
+concept = "kunsu";
+
+/* ---------- 引擎 ---------- */
+let exSeq = 0;
+function say(m) { m.ex = (S.flow && S.flow.ex) || 0; S.chat.push(m); }
+function openVisit() {
+  S.chat = []; S.flow = { ex: 0 }; S.skipped = []; S.ui.newflow = null; S.ui.pullOpen = false; S.ui.visitDone = 0;
+  const list = items();
+  if (O().brief) {
+    if (!list.length) { say({ k: "晚安。目前沒有事在等你。" }); return; }
+    const n = t => list.filter(i => i.kind === t).length;
+    const parts = [];
+    if (n("decision")) parts.push(`${n("decision")} 題要你決定${list.some(i => i.kind === "decision" && i.d.money) ? "（1 題動錢）" : ""}`);
+    if (n("perm")) parts.push(`${n("perm")} 個指令等你批准`);
+    if (n("reply")) parts.push(`${n("reply")} 段對話等你回話`);
+    say({ k: `晚安。現在有 ${list.length} 件：\n${parts.map(p => "・" + p).join("\n")}\n大概 ${Math.max(1, Math.round(list.length * 0.4))} 分鐘。`, briefList: true });
+    S.flow.waitingStart = true;
+    return;
+  }
+  say({ k: list.length ? `晚安。有 ${list.length} 件事在等你，我一件一件問。` : "晚安。目前沒有事在等你。" });
+  askNext();
+}
+function askNext() {
+  if (S.flow.waitingStart) return;
+  if (S.flow.current && items().some(i => i.id === S.flow.current)) return;
+  const it = items()[0];
+  if (!it) {
+    S.flow.current = null;
+    if (!S.flow.idleSaid) {
+      S.flow.ex = ++exSeq;
+      const r = running();
+      if (O().brief && S.ui.visitDone) say({ k: `都處理完了。這次你處理了 ${S.ui.visitDone} 件。${r.length ? "\n" + r.map(s => nameOf(s) + " " + s.run).join("、") + "，好了我再叫你。" : ""}`, recap: true });
+      else say({ k: r.length ? `目前沒有事在等你。${r.map(s => nameOf(s) + " " + s.run).join("、")}，好了我再叫你。` : "目前沒有事在等你。" });
+      S.flow.idleSaid = true;
+    }
+    return;
+  }
+  S.flow.idleSaid = false;
+  S.flow.current = it.id;
+  S.flow.ex = ++exSeq;
+  if (it.kind === "decision") { const d = it.d; say({ k: `${AGENT[d.agent]}（${d.project}）要你決定：\n${d.q}\n\n${d.why}`, mk: d.agent, ask: it.id, proj: d.project }); }
+  else if (it.kind === "perm") { const s = it.s; say({ k: `${nameOf(s)} 要執行：`, cmd: s.perm.cmd, k2: s.perm.why + (s.perm.risk ? "\n允許需要 Face ID。" : ""), mk: s.agent, ask: it.id, proj: nameOf(s) }); }
+  else { const s = it.s; say({ k: `${nameOf(s)} 問你：\n${(s.turns.filter(t => t.a).pop() || {}).a}`, mk: s.agent, ask: it.id, sid: s.id, proj: nameOf(s) }); }
+}
+function onNewItem() { askNext(); }
+function resume(sid) {
+  const s = S.sessions[sid]; if (!s) return;
+  s.status = "run"; s.run = "處理中"; s.time = "剛剛"; render();
+  later(2200, () => {
+    s.turns.push({ t: "讀了 3 個檔 · 改了 1 個檔" }, { a: REPLY }); s.status = "reply"; s.quick = ["A", "B", "繼續"];
+    const h = S.history.find(x => x.project === nameOf(s) && x.res === PENDING_RES);
+    if (h) h.res = "AI：這步處理完了，接著問你下一步。";
+    onNewItem();
+  });
+}
+function logHist(agent, project, q, a, res) { S.history.unshift({ day: "今晚", time: "剛剛", agent, project, q, a, res: res || PENDING_RES }); }
+function closeEx(label, proj) {
+  const m = S.chat.find(x => x.ask === S.flow.current);
+  if (m) { m.done = label; }
+  S.ui.visitDone = (S.ui.visitDone || 0) + 1;
+  S.flow.current = null;
+}
+function wire() {
+  afterDecision = (d, l) => { logHist(d.agent, d.project, d.q, l, d.session ? PENDING_RES : `已交給 ${AGENT[d.agent]}`); closeEx(l, d.project); say({ me: l }); say({ k: `好，轉給 ${d.project} 了。` }); askNext(); };
+  afterSend = (s, t) => { const last = (s.turns.filter(x => x.a).pop() || {}).a || ""; logHist(s.agent, nameOf(s), last, t); closeEx(t, nameOf(s)); say({ me: t }); say({ k: `好，轉給 ${nameOf(s)} 了。` }); askNext(); };
+  afterPermit = (s, allow, cmd) => { logHist(s.agent, nameOf(s), "要執行 " + cmd, allow ? "允許一次" : "拒絕", allow ? "AI：已推上去。" : "AI：好，不推。"); closeEx(allow ? "允許一次" : "拒絕", nameOf(s)); say({ me: allow ? "允許一次" : "拒絕" }); say({ k: allow ? `好，${nameOf(s)} 開始推。` : `好，跟 ${nameOf(s)} 說不要推。` }); askNext(); };
+}
+
+/* ---------- 畫面 ---------- */
+const clockIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>`;
+function bubble(m, active) {
+  if (m.me) return `<div class="me">${esc(m.me)}</div>`;
+  if (m.quote) return `<div style="display:flex;gap:8px;align-items:flex-end">${mark("k", 22)}<div class="qbub"><div class="meta" style="margin-bottom:6px">${esc(m.k)}</div><div class="ctx">${m.quote.map(l => `<div style="white-space:pre-wrap">${esc(l)}</div>`).join("")}</div></div></div>`;
+  let extra = "";
+  if (m.briefList && S.flow.waitingStart) {
+    extra = `<div class="kb">${items().map(it => { const a = it.kind === "decision" ? it.d.agent : it.s.agent; const n = it.kind === "decision" ? it.d.project : nameOf(it.s); const t = it.kind === "decision" ? it.d.q : it.kind === "perm" ? "要執行 " + it.s.perm.cmd : "等你回話";
+      return `<button data-a="bjump" data-v="${it.id}" style="justify-content:flex-start;text-align:left;font-weight:500">${mark(a, 16)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>${esc(n)}</b>　${esc(t)}</span></button>`; }).join("")}</div>`;
+  }
+  if (m.recap) extra = `<div class="kb"><button data-a="hist">看這次的紀錄</button></div>`;
+  return `<div style="display:flex;gap:8px;align-items:flex-end">${mark(m.mk || "k", 22)}<div class="qbub" style="${active ? "border-color:#3a3e46" : "opacity:.85"}">
+    <div style="white-space:pre-wrap;color:var(--strong)">${esc(m.k)}</div>${m.cmd ? `<div class="cmd" style="margin:8px 0">${esc(m.cmd)}</div><div class="meta" style="white-space:pre-wrap">${esc(m.k2)}</div>` : ""}${extra}</div></div>`;
+}
+function chatHTML() {
+  const out = [];
+  if (O().collapse) {
+    const seen = new Set();
+    S.chat.forEach(m => {
+      const head = S.chat.find(x => x.ex === m.ex && x.ask);
+      if (head && head.done && m.ex) {
+        if (seen.has(m.ex)) return; seen.add(m.ex);
+        out.push(`<button class="sys" data-a="hist" data-v="${esc(head.proj)}" style="display:flex;gap:6px;align-items:center;min-height:32px;padding:0 10px;border-radius:999px;background:var(--card);border:1px solid var(--line)">${mark(head.mk, 14)}<span style="color:var(--ok)">✓</span> ${esc(head.done)} → ${esc(head.proj)}</button>`);
+        return;
+      }
+      out.push(bubble(m, m.ask && m.ask === S.flow.current));
+    });
+    return out.join("");
+  }
+  return S.chat.map(m => bubble(m, m.ask && m.ask === S.flow.current)).join("");
+}
+function pullHTML() {
+  if (!O().pull) return "";
+  const n = S.history.length;
+  if (!S.ui.pullOpen) return `<button class="sys" data-a="pull" style="min-height:40px;width:100%;border-bottom:1px dashed var(--line)">↑ 稍早 · ${n} 則問答</button>`;
+  let day = "", h = `<button class="sys" data-a="pull" style="min-height:40px;width:100%">收起稍早的 ↓</button>`;
+  [...S.history].reverse().forEach(x => {
+    if (x.day !== day) { day = x.day; h += `<div class="sys" style="margin:6px 0">— ${day} —</div>`; }
+    h += `<div style="display:flex;gap:8px;align-items:flex-end;opacity:.6">${mark(x.agent, 18)}<div class="qbub" style="padding:8px 12px"><div class="meta">${esc(x.project)} · ${x.time}</div><div style="font-size:14px">${esc(x.q)}</div></div></div>
+      <div class="me" style="opacity:.6;font-size:14px">${esc(x.a)}</div><div class="sys" style="opacity:.7">${esc(x.res)}</div>`;
+  });
+  return h + `<div class="sys" style="margin:8px 0;color:var(--strong)">— 這次 —</div>`;
+}
+function historySheet(filter) {
+  const projects = [...new Set(S.history.map(x => x.project))];
+  const list = S.history.filter(x => !filter || x.project === filter);
+  let day = "", rows = "";
+  list.forEach(x => {
+    if (x.day !== day) { day = x.day; rows += `<div class="lbl" style="margin-top:8px">${day}</div>`; }
+    rows += `<div class="card" style="gap:6px"><div class="meta" style="display:flex;gap:8px;align-items:center">${mark(x.agent, 16)}<b style="color:var(--body)">${esc(x.project)}</b><span style="flex:1"></span>${x.time}</div>
+      <div style="font-size:14px">${esc(x.q)}</div><div style="color:var(--strong);font-weight:700">你：${esc(x.a)}</div><div class="meta">${esc(x.res)}</div></div>`;
+  });
+  return `<div class="hdr" style="border:0"><div class="t">紀錄</div><span class="sp"></span><button class="meta" data-a="close" style="min-height:44px">關閉</button></div>
+    <div style="padding:0 16px 8px"><div class="chips"><button class="chip ${!filter ? "on" : ""}" data-a="hfilter" data-v="">全部</button>${projects.map(p => `<button class="chip ${filter === p ? "on" : ""}" data-a="hfilter" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div></div>
+    <div class="body"><div class="pad" style="padding-top:4px">${rows || '<div class="meta">還沒有紀錄</div>'}</div></div>`;
+}
+const _sheetHTML = sheetHTML;
+sheetHTML = function () {
+  if (S.sheet && S.sheet.kind === "history") return `<div class="sheet-bg" data-a="bgclose"><div class="sheet" role="dialog" aria-modal="true" style="height:92%"><div class="grab"></div>${historySheet(S.sheet.filter)}</div></div>`;
+  return _sheetHTML();
+};
+
+function screen() {
+  if (!S.chat.length && !S.opened) { S.opened = true; openVisit(); }
+  const list = items(), cur = list.find(i => i.id === S.flow.current);
+  const nf = S.ui.newflow;
+  let chips = [];
+  if (nf) {
+    if (!nf.agent) chips = [["Claude", "nf-agent", "claude"], ["Codex", "nf-agent", "codex"]];
+    else if (!nf.project) chips = ["kunsu", "ads-review", "blog-site", "demo-shop"].map(p => [p, "nf-proj", p]);
+    chips.push(["取消", "nf-cancel", ""]);
+  } else if (S.flow.waitingStart) {
+    chips = [["開始", "bstart", ""]];
+  } else if (cur) {
+    if (cur.kind === "decision") chips = cur.d.money ? [["打開核對（Face ID）", "dec", cur.d.id, -1]] : cur.d.opts.map((o, i) => [o.l + (o.rec ? " ★" : ""), "dec", cur.d.id, i]);
+    else if (cur.kind === "perm") chips = [["允許一次", "perm", cur.s.id, 1], ["拒絕", "perm", cur.s.id, 0]];
+    else chips = (cur.s.quick || ["繼續"]).map(q => [q, "quick", cur.s.id, q]);
+    if (O().ask) { chips.push(["為什麼？", "why", cur.id]); chips.push(["前因後果？", "ctx", cur.id]); }
+    chips.push(["等下再說", "skip", cur.id]);
+  }
+  const ghost = a => ["skip", "nf-cancel", "why", "ctx"].includes(a);
+  const ph = nf ? (nf.project ? "要做什麼？" : "選一個") : S.flow.waitingStart ? "按「開始」，或從清單選一件" : cur ? (cur.kind === "reply" ? `回覆 ${nameOf(cur.s)}…` : cur.kind === "decision" ? "要補充說明可以打字" : "用上面的按鈕回答") : "跟軍師說…";
+  const strip = O().brief && !S.flow.waitingStart && list.length > 1 ? `<div style="display:flex;gap:6px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)" class="meta">接下來 ${list.slice(1).map(it => mark(it.kind === "decision" ? it.d.agent : it.s.agent, 16)).join("")}</div>` : "";
+  return `<div class="sbar"><span>23:44</span><i></i></div>
+    <div class="hdr">${mark("k", 30)}<div><div class="t">軍師</div><div class="meta" style="font-size:12px">${list.length ? `還有 ${list.length} 件在等你` : "沒有事在等你"}</div></div><span class="sp"></span>
+      ${O().historyIcon ? `<button data-a="hist" aria-label="紀錄" style="display:flex;align-items:center;gap:4px;color:var(--body);min-height:44px;padding:0 6px">${clockIcon}<span style="font-size:13px">紀錄</span></button>` : ""}</div>
+    ${strip}
+    <div class="body" data-bottom><div class="pad">${pullHTML()}${chatHTML()}</div></div>
+    <div class="composer"><div class="chips">${chips.map(([l, a, v, i], n) => `<button class="chip ${n === 0 && !ghost(a) ? "on" : ghost(a) ? "ghost" : ""}" data-a="${a}" data-v="${esc(v)}" data-i="${i ?? ""}" data-t="${esc(i ?? "")}">${esc(l)}</button>`).join("")}</div>
+      <div class="inrow"><button class="chip" data-a="nf-start" aria-label="開新對話" style="width:44px;padding:0;justify-content:center;font-size:20px">＋</button><input id="msg" placeholder="${esc(ph)}" autocomplete="off" ${cur && cur.kind === "perm" && !nf ? "disabled" : ""}><button class="send" data-a="k-send" aria-label="送出">↑</button></div></div>`;
+}
+
+/* ---------- render + events ---------- */
+const phone = document.getElementById("phone");
+function render() {
+  const keep = document.getElementById("msg");
+  const draft = keep ? keep.value : "", hadFocus = document.activeElement === keep;
+  phone.innerHTML = `<div class="scr">${screen()}</div>${overlays()}`;
+  const inp = document.getElementById("msg");
+  if (inp && draft) inp.value = draft;
+  if (inp && hadFocus) inp.focus();
+  if (!S.ui.keepScroll) phone.querySelectorAll("[data-bottom]").forEach(b => b.scrollTop = b.scrollHeight);
+  S.ui.keepScroll = false;
+}
+function renderChrome() {
+  document.getElementById("tabs").innerHTML = VORDER.map((k, i) => `<button type="button" data-c="${k}" aria-pressed="${k === V}"><span class="n">3${String.fromCharCode(65 + i)}</span>${VARIANTS[k].title}</button>`).join("");
+  const c = VARIANTS[V];
+  document.getElementById("notes").innerHTML = `<h2>${c.title}</h2><p class="one">${c.one}</p>
+    <h3>好在哪</h3><ul>${c.why.map(x => `<li>${x}</li>`).join("")}</ul>
+    <h3>風險</h3><ul>${c.risk.map(x => `<li>${x}</li>`).join("")}</ul>
+    <div class="try"><b>試試看：</b>${c.try}</div>
+    <h3>五個變化共用的規則</h3><ul><li>每次打開都是乾淨的；以前的問答只在紀錄裡（「往上拉」版放在對話上方，預設收起）。</li><li>軍師一次只問一件，所以你打的字一定是在回這一件。</li><li>沒有完整對話；要看前因後果用追問或紀錄，逐字原文到電腦上看。</li><li>決定題只能用選項回答；動錢要自己選並過 Face ID；其他送出 5 秒內可撤回。</li></ul>`;
+}
+function setVariant(k) {
+  V = k; fresh(); S.history = structuredClone(HIST0); S.flow = { ex: 0 }; S.opened = false; exSeq = 0; wire();
+  try { localStorage.setItem("kunsu-chat-variant", k); } catch (e) {}
+  renderChrome(); render();
+}
+function reopen() {
+  if (S.toast) { clearTimeout(S.toast.timer); const t = S.toast; S.toast = null; t.commit(); }
+  S.sheet = null; openVisit(); render();
+}
+document.getElementById("tabs").addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (b) setVariant(b.dataset.c); });
+document.getElementById("reset").addEventListener("click", () => setVariant(V));
+document.getElementById("reopen").addEventListener("click", reopen);
+
+function excerpt(id) {
+  const it = items().find(x => x.id === id); if (!it) return null;
+  const sid = it.kind === "decision" ? it.d.session : it.s.id;
+  const s = sid && S.sessions[sid];
+  return { it, s };
+}
+phone.addEventListener("click", e => {
+  const el = e.target.closest("[data-a]"); if (!el) return;
+  const a = el.dataset.a, v = el.dataset.v, i = el.dataset.i;
+  if (a === "bgclose" && e.target !== el) return;
+  const take = () => { const x = document.getElementById("msg"); const t = x ? x.value.trim() : ""; if (x) x.value = ""; return t; };
+  switch (a) {
+    case "undo": undo(); break;
+    case "close": case "bgclose": S.sheet = null; render(); break;
+    case "hist": S.sheet = { kind: "history", filter: v || null }; render(); break;
+    case "hfilter": S.sheet.filter = v || null; render(); break;
+    case "pull": S.ui.pullOpen = !S.ui.pullOpen; S.ui.keepScroll = S.ui.pullOpen; render(); if (S.ui.pullOpen) phone.querySelector("[data-bottom]").scrollTop = 0; break;
+    case "dec": { const d = S.decisions.find(x => x.id === v); if (d && d.money) { S.sheet = { kind: "decision", id: v, sel: null }; render(); } else answer(v, +i); break; }
+    case "pick": S.sheet.sel = +i; render(); break;
+    case "sheetsubmit": answer(S.sheet.id, S.sheet.sel, true); break;
+    case "perm": permit(v, i === "1"); break;
+    case "quick": send(v, el.dataset.t); break;
+    case "skip": S.skipped = S.skipped.filter(x => x !== v); S.skipped.push(v); closeEx("等下再說"); S.ui.visitDone--; const m = S.chat.find(x => x.ask === v); if (m) m.done = null;
+      say({ me: "等下再說" }); say({ k: "好，排到最後。" }); askNext(); render(); break;
+    case "bstart": S.flow.waitingStart = false; say({ me: "開始" }); askNext(); render(); break;
+    case "bjump": S.flow.waitingStart = false; S.skipped = items().map(x => x.id).filter(x => x !== v); say({ me: "先處理這件" }); askNext(); render(); break;
+    case "why": { const x = excerpt(v); if (!x) break; say({ me: "為什麼？" });
+      if (x.it.kind === "decision") { const r = x.it.d.opts.find(o => o.rec); say({ k: `AI 建議「${r.l}」，理由是：${r.d || "沒有另外說明"}。\n${x.it.d.why}` }); }
+      else if (x.it.kind === "perm") say({ k: `${nameOf(x.s)} 修好了 tracker 而且測試通過，下一步是把分支推到遠端，之後才能開 PR。` });
+      else say({ k: `它剛做完：${(x.s.turns.filter(t => t.t).pop() || {}).t || "上一步"}，現在要你決定下一步。` });
+      render(); break; }
+    case "ctx": { const x = excerpt(v); if (!x) break; say({ me: "前因後果？" });
+      if (!x.s) say({ k: "這題沒有對應的對話，是排程直接問你的。" });
+      else say({ k: `${nameOf(x.s)} 的對話摘錄：`, quote: x.s.turns.slice(-4).map(t => t.u ? "你：" + t.u : t.t ? "⚙︎ " + t.t : t.a ? "AI：" + t.a.split("\n")[0] : "") });
+      render(); break; }
+    case "nf-start": S.ui.newflow = {}; say({ me: "開新對話" }); say({ k: "要給誰？" }); render(); break;
+    case "nf-agent": S.ui.newflow.agent = v; say({ me: AGENT[v] }); say({ k: "哪個專案？" }); render(); break;
+    case "nf-proj": S.ui.newflow.project = v; say({ me: v }); say({ k: "要做什麼？直接打字。" }); render(); break;
+    case "nf-cancel": S.ui.newflow = null; say({ me: "算了" }); say({ k: "好。" }); render(); break;
+    case "k-send": {
+      const t = take(); if (!t) break;
+      const nf = S.ui.newflow;
+      if (nf && nf.project) { S.ui.newflow = null; startNew(nf.agent, nf.project, t); logHist(nf.agent, nf.project, "你開了新對話", t); say({ me: t }); say({ k: `好，開了一段新的 ${AGENT[nf.agent]} 對話在 ${nf.project}，有事我再問你。` }); render(); break; }
+      const cur = items().find(x => x.id === S.flow.current);
+      if (cur && cur.kind === "reply") send(cur.s.id, t);
+      else if (cur && cur.kind === "decision") { say({ me: t }); say({ k: "這題要點選項回答；你打的字我先記成補充說明。" }); render(); }
+      else { say({ me: t }); say({ k: "現在沒有事在等你。要開新對話的話按左邊的「＋」。" }); render(); }
+      break;
+    }
+  }
+});
+phone.addEventListener("keydown", e => {
+  if (e.key !== "Enter" || e.isComposing || e.target.id !== "msg") return;
+  const b = phone.querySelector('[data-a="k-send"]'); if (b) b.click();
+});
+
+let startV = "clean";
+try { startV = localStorage.getItem("kunsu-chat-variant") || "clean"; } catch (e) {}
+if (location.hash && VARIANTS[location.hash.slice(1)]) startV = location.hash.slice(1);
+setVariant(VARIANTS[startV] ? startV : "clean");
+</script>

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "主視窗側欄頂端 44 px 拖曳區（data-tauri-drag-region）要的拖曳權限；只給 main，瀏海與蓋板不能被拖動（CONTRACT §15、AC-AS-01）。",
+  "windows": ["main"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

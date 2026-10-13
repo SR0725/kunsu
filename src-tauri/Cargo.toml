@@ -1,0 +1,57 @@
+[package]
+name = "kunsu-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Kunsu Tauri 2 shell（bundle id me.ray.kunsu）：內嵌 kunsu-server、tray、膠囊/蓋板視窗、通知、全域快捷鍵、GuardProbe 真偵測。"
+
+[lib]
+name = "kunsu_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+kunsu-core = { path = "../crates/kunsu-core" }
+kunsu-server = { path = "../crates/kunsu-server" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["clock"] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-global-shortcut = "2"
+open = "5"
+# UI 簽章（approval 題 Answer.signature；HMAC key 走 kunsu-server KeyProvider）
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# NSWindow level / collectionBehavior / ignoresMouseEvents、NSWorkspace、NSEvent；
+# CoreMediaIO / CoreAudio / CoreGraphics / CoreFoundation 走 guards.rs 手寫 FFI
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = [
+    "block2",
+    "NSWindow",
+    "NSScreen",
+    "NSWorkspace",
+    "NSRunningApplication",
+    "NSEvent",
+    "NSGraphics",
+    "NSResponder",
+    "NSImage",
+    "NSImageRep",
+    "NSBitmapImageRep",
+    "NSView",
+] }
+# 證據畫布註冊檢查：WKWebView 截圖（使用者會看到的面板）
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kunsu 決策面板</title>
+<!--
+  設計原型（非產品程式）：點開邊緣瀏海後的完整決策介面。
+  1) 開啟動畫「瀏海張開」：瀏海先沿邊延伸到整個高度，再往螢幕內展開成黑色面板；圖示做共享元素飛行。
+  2) 版面「證據｜決定」：左欄是 AI 的脈絡與圖表證據，右欄只放這一題的決定；送出永遠在右下角，
+     「稍後再問」在右上角，「這題不該問我」在左下角的次要文字鈕。
+  3) Agent 內容走有界的視覺區塊語法（stats / line / bars / images / meter / streak / context），
+     由 Kunsu 統一繪製，不接受 agent 的 CSS 或 script。
+-->
+<style>
+:root {
+  --page: #e7e9ee; --page-ink: #15171b; --page-muted: #5b616c; --page-panel: #ffffff; --page-line: #d4d7dd; --page-accent: #3b4250;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #0e1013; --page-ink: #eceef2; --page-muted: #8d94a0; --page-panel: #16191e; --page-line: #2a2e35; --page-accent: #c9ced8; }
+}
+:root[data-theme="dark"] { --page: #0e1013; --page-ink: #eceef2; --page-muted: #8d94a0; --page-panel: #16191e; --page-line: #2a2e35; --page-accent: #c9ced8; }
+
+/* Kunsu 面板永遠是暗色（品牌 surface） */
+.viz-root {
+  color-scheme: dark;
+  --surface: #000000;
+  --card: #0b0c0e;
+  --card-2: #111317;
+  --hair: #1d2026;
+  --hair-2: #2a2e35;
+  --ink: #f2f3f5;
+  --ink-2: #c3c7ce;
+  --ink-3: #8b919b;
+  --ink-4: #5f6570;
+  --accent: #3987e5;         /* 類別色 slot 1（dark），已用 validator 對 #0b0c0e 驗證 */
+  --accent-wash: rgba(57,135,229,.10);
+  --good: #83C494; --bad: #EF8D86; --warn: #D9B26A;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-ink); font-family: "Geist Sans", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; }
+main { display: grid; gap: 14px; padding: 16px; max-width: 1520px; margin: 0 auto; }
+header.page h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; }
+header.page p { margin: 0; color: var(--page-muted); font-size: 13px; line-height: 1.6; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 12px; border: 1px solid var(--page-line); border-radius: 12px; background: var(--page-panel); font-size: 12px; }
+.controls fieldset { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 0; border: 0; }
+.controls legend { float: left; margin-right: 6px; color: var(--page-muted); }
+.controls button { font: inherit; border: 1px solid var(--page-line); border-radius: 6px; background: transparent; color: var(--page-ink); padding: 4px 9px; cursor: pointer; }
+.controls button[aria-pressed="true"] { background: var(--page-accent); color: var(--page-panel); border-color: var(--page-accent); }
+.device-wrap { position: relative; margin: 0 auto; }
+.device { position: absolute; left: 0; top: 0; padding: 14px 14px 18px; border-radius: 26px; background: #050505; box-shadow: 0 30px 60px rgba(0,0,0,.28); transform-origin: top left; }
+.display { position: relative; overflow: hidden; border-radius: 12px 12px 4px 4px; background: #000; user-select: none; }
+.desktop { position: absolute; inset: 0; background:
+  radial-gradient(120% 90% at 20% 10%, #8fb3d9 0%, transparent 55%),
+  radial-gradient(90% 80% at 85% 85%, #d9a38f 0%, transparent 60%),
+  linear-gradient(160deg, #a9bfd6, #c7b7c9 60%, #d7c2b2);
+  transition: filter 420ms cubic-bezier(.16,1,.3,1); }
+.desktop[data-dim="true"] { filter: blur(22px) brightness(.5) saturate(.8); }
+.menubar { position: absolute; inset: 0 0 auto 0; height: 37px; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: rgba(255,255,255,.28); font-size: 13px; color: #111; }
+.menubar .right { margin-left: auto; display: flex; gap: 14px; }
+.hw-notch { position: absolute; top: 0; left: 50%; width: 190px; height: 37px; transform: translateX(-50%); background: #000; border-radius: 0 0 10px 10px; }
+.window-mock { position: absolute; left: 20%; top: 16%; width: 56%; height: 62%; border-radius: 12px; background: rgba(250,250,252,.94); box-shadow: 0 20px 50px rgba(0,0,0,.25); padding: 48px 28px; color: #333; font-size: 14px; line-height: 1.8; }
+#shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+#notchHit { cursor: pointer; }
+.fly { position: absolute; left: 0; top: 0; width: 18px; height: 18px; pointer-events: none; z-index: 30; }
+.toast { position: absolute; left: 56px; bottom: 40px; padding: 9px 14px; border-radius: 10px; background: rgba(10,10,12,.88); color: #eef0f3; font-size: 13px; opacity: 0; transition: opacity 200ms ease; pointer-events: none; z-index: 40; }
+.toast[data-show="true"] { opacity: 1; }
+
+/* ───────────── 面板 ───────────── */
+.panel { position: absolute; z-index: 20; display: grid; grid-template-rows: 68px minmax(0,1fr); color: var(--ink); visibility: hidden; font-size: 14px; }
+.panel[data-visible="true"] { visibility: visible; }
+.reveal { opacity: 0; transform: translateY(8px); transition: opacity 160ms ease, transform 160ms ease; }
+.panel[data-open="true"] .reveal { opacity: 1; transform: none; transition: opacity 280ms ease, transform 420ms cubic-bezier(.16,1,.3,1); transition-delay: calc(var(--i, 0) * 45ms); }
+.panel[data-reduced="true"] .reveal { transform: none !important; transition-duration: 160ms !important; transition-delay: 0ms !important; }
+.swap { transition: opacity 160ms ease; }
+.swap[data-fading="true"] { opacity: 0; }
+
+.p-head { display: flex; align-items: center; gap: 16px; padding: 0 28px 0 56px; border-bottom: 1px solid var(--hair); }
+.src { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mark-slot { width: 26px; height: 26px; flex: none; }
+.src-name { font-weight: 620; font-size: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--card-2); border: 1px solid var(--hair-2); color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+.muted { color: var(--ink-3); }
+.queue { display: flex; align-items: center; gap: 8px; margin-left: 18px; color: var(--ink-3); font-size: 12px; }
+.icon-btn { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink-2); cursor: pointer; font: inherit; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.icon-btn:hover:not(:disabled) { background: var(--card-2); }
+.dots { display: flex; gap: 5px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--hair-2); }
+.dots i[data-on="true"] { background: var(--ink); }
+.dots i[data-done="true"] { background: var(--ink-4); }
+.head-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.cycle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.later { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink-2); cursor: pointer; font: inherit; font-size: 13px; }
+.later:hover { background: var(--card-2); color: var(--ink); }
+kbd { font-family: "Geist Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-3); border: 1px solid var(--hair-2); border-radius: 5px; padding: 1px 5px; background: var(--card); }
+
+.p-body { display: grid; grid-template-columns: minmax(0, 1.42fr) minmax(430px, 1fr); gap: 44px; min-height: 0; padding: 0 28px 0 56px; }
+.evidence { min-height: 0; overflow: auto; padding: 24px 6px 32px 0; scrollbar-width: thin; scrollbar-color: #2a2e35 transparent; }
+.decision { display: flex; flex-direction: column; min-height: 0; padding: 26px 0 24px; }
+
+.sec-label { margin: 0 0 10px; color: var(--ink-3); font-size: 12px; font-weight: 520; letter-spacing: .02em; }
+.card { border: 1px solid var(--hair); border-radius: 16px; background: var(--card); padding: 18px 20px; }
+.card + .card, .card + .grid2, .grid2 + .card { margin-top: 14px; }
+
+/* 脈絡 */
+.why-sum { margin: 0 0 14px; font-size: 16px; line-height: 1.6; color: var(--ink); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.steps li { position: relative; display: grid; grid-template-columns: 52px 14px 1fr; gap: 10px; align-items: start; padding: 5px 0; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.steps time { color: var(--ink-4); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
+.steps .node { position: relative; width: 14px; height: 14px; display: grid; place-items: center; }
+.steps .node::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-4); }
+.steps li:not(:last-child) .node::after { content: ""; position: absolute; top: 12px; left: 6.5px; width: 1px; height: calc(100% + 12px); background: var(--hair-2); }
+.steps li.now { color: var(--ink); }
+.steps li.now .node::before { width: 9px; height: 9px; background: var(--ink); box-shadow: 0 0 0 3px rgba(242,243,245,.14); }
+.ctx-actions { display: flex; gap: 14px; margin-top: 12px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--hair-2); text-underline-offset: 3px; }
+.link-btn:hover { color: var(--ink); text-decoration-color: var(--ink-3); }
+.excerpt { display: none; margin-top: 12px; padding: 12px 14px; border-left: 2px solid var(--hair-2); color: var(--ink-2); font-size: 13px; line-height: 1.7; background: var(--card-2); border-radius: 0 10px 10px 0; }
+.excerpt[data-open="true"] { display: block; }
+
+/* 數字卡 */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 14px; }
+.stat { border: 1px solid var(--hair); border-radius: 14px; background: var(--card); padding: 14px 14px 10px; min-width: 0; }
+.stat .lbl { color: var(--ink-3); font-size: 12px; }
+.stat .val { margin-top: 6px; font-size: 24px; font-weight: 620; letter-spacing: -.01em; }
+.stat .delta { margin-top: 2px; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .delta b { font-weight: 600; }
+.stat .delta b[data-tone="good"] { color: var(--good); }
+.stat .delta b[data-tone="bad"] { color: var(--bad); }
+.stat svg { display: block; margin-top: 8px; width: 100%; height: 26px; }
+
+/* 圖表 */
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.chart-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.chart-sub { font-size: 12px; color: var(--ink-3); }
+.chart-wrap { position: relative; }
+.chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tip { position: absolute; z-index: 5; pointer-events: none; min-width: 120px; padding: 8px 10px; border-radius: 10px; background: #16181d; border: 1px solid var(--hair-2); color: var(--ink); font-size: 12px; line-height: 1.5; box-shadow: 0 10px 30px rgba(0,0,0,.4); opacity: 0; transition: opacity 120ms ease; }
+.tip[data-show="true"] { opacity: 1; }
+.tip .t-date { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.table-view { display: none; margin-top: 10px; max-height: 180px; overflow: auto; }
+.table-view[data-open="true"] { display: block; }
+.table-view table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.table-view th, .table-view td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--hair); color: var(--ink-2); }
+.table-view th { color: var(--ink-3); font-weight: 500; position: sticky; top: 0; background: var(--card); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+.grid2 .card { margin-top: 0; }
+
+/* 素材圖 */
+.shots { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.shot { display: grid; gap: 6px; margin: 0; }
+.shot .img { position: relative; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; display: flex; align-items: flex-end; padding: 10px; color: #fff; font-size: 12px; font-weight: 650; line-height: 1.35; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+.shot figcaption { font-size: 12px; color: var(--ink-2); }
+.shot figcaption span { color: var(--ink-3); }
+.shot[data-best="true"] figcaption::before { content: "最佳 · "; color: var(--ink); font-weight: 600; }
+
+/* 決定欄 */
+.ask-label { color: var(--ink-3); font-size: 12px; font-weight: 520; letter-spacing: .02em; }
+.ask { margin: 8px 0 10px; font-size: 27px; line-height: 1.32; font-weight: 650; letter-spacing: -.01em; }
+.conseq { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--ink-3); font-size: 13px; line-height: 1.55; }
+.conseq b { color: var(--ink-2); font-weight: 560; }
+.params { margin-top: 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--hair-2); background: var(--card); font-family: "Geist Mono", ui-monospace, monospace; font-size: 13px; color: var(--ink); line-height: 1.6; }
+.params small { display: block; font-family: "Geist Sans", "PingFang TC", sans-serif; color: var(--ink-3); font-size: 11px; margin-bottom: 4px; }
+.opts { display: grid; gap: 8px; margin-top: 18px; }
+.opt { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 4px 12px; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--hair-2); background: var(--card); color: var(--ink); text-align: left; font: inherit; cursor: pointer; transition: border-color 120ms ease, background 120ms ease; }
+.opt:hover { border-color: #3d424b; background: #0f1114; }
+.opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.opt[aria-checked="true"] { border-color: var(--ink); background: #121419; box-shadow: inset 0 0 0 1px var(--ink); }
+.opt .k { grid-row: span 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--hair-2); color: var(--ink-3); font-size: 12px; font-family: "Geist Mono", ui-monospace, monospace; }
+.opt[aria-checked="true"] .k { background: var(--ink); color: #0b0c0e; border-color: var(--ink); }
+.opt .l { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.opt .reco { display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 999px; background: rgba(242,243,245,.1); color: var(--ink); font-size: 11px; font-weight: 600; }
+.opt .d { color: var(--ink-3); font-size: 13px; line-height: 1.55; }
+.opt .tags { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.opt .tags span { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; background: var(--card-2); color: var(--ink-2); font-size: 11px; }
+.note { margin-top: 12px; }
+.note label { display: block; margin-bottom: 6px; color: var(--ink-3); font-size: 12px; }
+.note textarea { display: block; width: 100%; min-height: 64px; max-height: 220px; resize: none; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--hair-2); background: var(--card); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.6; outline: none; }
+.note textarea:focus { border-color: #4a505a; }
+.note[data-primary="true"] textarea { min-height: 200px; font-size: 15px; }
+.choice-sum { margin-top: 10px; min-height: 20px; color: var(--ink-3); font-size: 12px; }
+.choice-sum b { color: var(--ink); font-weight: 600; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--hair); }
+.reject { border: 0; background: none; color: var(--ink-3); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
+.reject:hover { color: var(--ink); }
+.send { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--ink); color: #0b0c0e; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; transition: transform 100ms ease, background 120ms ease; }
+.send kbd { background: transparent; border-color: rgba(11,12,14,.25); color: rgba(11,12,14,.6); }
+.send:hover:not(:disabled) { background: #ffffff; }
+.send:active:not(:disabled) { transform: scale(.975); }
+.send:disabled { background: #22252b; color: #6b707a; cursor: not-allowed; }
+.send:disabled kbd { color: #6b707a; border-color: #34383f; }
+
+/* 回執 */
+.receipt { display: grid; gap: 14px; margin-top: 18px; }
+.rc-row { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; font-size: 14px; color: var(--ink-2); opacity: 0; transform: translateY(6px); transition: opacity 240ms ease, transform 320ms cubic-bezier(.16,1,.3,1); }
+.rc-row[data-on="true"] { opacity: 1; transform: none; }
+.rc-row .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--good); font-size: 12px; }
+.rc-row small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+.rc-final { margin-top: 6px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--hair-2); background: var(--card); color: var(--ink); font-size: 14px; }
+
+/* 內容語法區塊 */
+.blk + .blk { margin-top: 14px; }
+.evidence > .card + .blk { margin-top: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 6px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 14px; height: 2px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.md-p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.75; }
+.md-p b, .md-list b { color: var(--ink); }
+.md-h { margin: 6px 0 0; font-size: 14px; font-weight: 620; }
+.md-list { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; line-height: 1.75; }
+.md-quote { margin: 12px 0 0; padding: 10px 14px; border-left: 2px solid var(--hair-2); border-radius: 0 10px 10px 0; background: var(--card-2); color: var(--ink-2); font-size: 13.5px; line-height: 1.75; }
+.md-link { text-decoration: underline; text-decoration-color: var(--hair-2); text-underline-offset: 3px; }
+.md-table { padding: 6px 8px; overflow: auto; }
+.md-table table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.md-table th, .md-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hair); color: var(--ink-2); }
+.md-table tr:last-child td { border-bottom: 0; }
+.md-table th { color: var(--ink-3); font-weight: 500; font-size: 12px; }
+.md-table b { color: var(--ink); font-weight: 600; }
+.shots { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.shots[data-large="true"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.shots[data-large="true"] .img { aspect-ratio: 16 / 10; font-size: 18px; padding: 16px; }
+.raw { display: none; margin: 12px 0 0; padding: 12px 14px; max-height: 260px; overflow: auto; border-radius: 10px; background: #060708; border: 1px solid var(--hair); color: #aeb4be; font: 12px/1.6 "Geist Mono", ui-monospace, monospace; white-space: pre-wrap; }
+.raw[data-open="true"] { display: block; }
+.raw-meta { display: none; margin-top: 6px; color: var(--ink-4); font-size: 11px; }
+.raw-meta[data-open="true"] { display: block; }
+/* 沒有證據區塊時：單欄，只做決定 */
+.p-body.focus { grid-template-columns: minmax(0, 760px); justify-content: center; }
+.p-body.focus .decision { padding-top: 32px; }
+.p-body.focus .decision > .card { margin-bottom: 26px; }
+
+.notes { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--page-line); border-radius: 12px; background: var(--page-panel); font-size: 12.5px; line-height: 1.65; color: var(--page-muted); }
+.notes strong { color: var(--page-ink); }
+@media (max-width: 720px) { main { padding: 12px 16px; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <h1>Kunsu 決策面板（點開瀏海後）設計原型</h1>
+    <p>點左側黑色瀏海打開：瀏海先沿螢幕邊延伸，再往內展開成面板。左欄看 AI 的脈絡與圖表，右欄只做這一題的決定。按 1–3 選選項、Enter 送出、Esc 稍後再問。</p>
+  </header>
+
+  <section class="controls" aria-label="原型控制">
+    <fieldset><legend>瀏海位置</legend>
+      <button data-anchor="left" aria-pressed="true">左側</button>
+      <button data-anchor="tl">左上角</button>
+    </fieldset>
+    <fieldset><legend>動作</legend>
+      <button id="btnOpen">打開</button>
+      <button id="btnReset">重置三題</button>
+    </fieldset>
+    <fieldset><legend>其他</legend>
+      <button data-toggle="reduced">減少動態</button>
+      <button data-toggle="slow">慢動作 ×4</button>
+    </fieldset>
+  </section>
+
+  <div class="device-wrap" id="deviceWrap">
+    <div class="device" id="device">
+      <div class="display viz-root" id="display">
+        <div class="desktop" id="desktop">
+          <div class="menubar"><b></b><span>Finder</span><span>檔案</span><span>編輯</span><span>顯示方式</span><div class="right"><span>週四 09:41</span></div></div>
+          <div class="hw-notch"></div>
+          <div class="window-mock">你正在做別的事。Kunsu 的瀏海貼在左側邊緣，點它就會展開成決策面板；按「稍後再問」或 Esc 會收回成瀏海，15 分鐘後再問你。</div>
+        </div>
+        <svg id="shape" xmlns="http://www.w3.org/2000/svg" aria-hidden="false">
+          <defs>
+            <linearGradient id="codexFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a8f6"/><stop offset=".55" stop-color="#6c78f5"/><stop offset="1" stop-color="#3430ef"/></linearGradient>
+          </defs>
+          <g id="shapeFill"></g>
+          <g id="notchHit" role="button" aria-label="Kunsu：你有待處理通知，按一下打開"></g>
+        </svg>
+        <svg class="fly" id="fly" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <section class="panel" id="panel" aria-label="Kunsu 決策面板" data-visible="false" data-open="false"></section>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="notes" aria-label="Logo 修正對照">
+    <div><strong>Claude 圖示修正：</strong>左邊是現在蓋板用的粒子圖形（把「✳」文字拆成粒子，八條等長直線）；右邊改成從 Claude App 內建 AppLogo 的官方向量取樣，同一份向量也用在瀏海與面板左上角。</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <figure style="margin:0"><canvas id="logoOld" width="260" height="260" style="width:260px;height:260px;border-radius:14px;background:#0b0c0e"></canvas><figcaption>現在：✳ 文字粒子</figcaption></figure>
+      <figure style="margin:0"><canvas id="logoNew" width="260" height="260" style="width:260px;height:260px;border-radius:14px;background:#0b0c0e"></canvas><figcaption>修正後：官方星芒向量粒子</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div><strong>動畫：</strong>舊的墨水圓形擴散與粒子和瀏海沒有空間關係。新動畫讓瀏海本身變成面板：先沿邊延伸（約 300 ms），再往內展開（約 480 ms，臨界阻尼不回彈），背景同時模糊變暗，來源圖示從瀏海飛到面板左上角，內容最後依序淡入。收起時倒放回瀏海。減少動態時改為 160 ms 淡入淡出。</div>
+    <div><strong>按鈕：</strong>右下角只放「送出決定」，選項或文字沒準備好時是停用狀態；「稍後再問」移到右上角，明講它的後果（15 分鐘後再問）；「這題不該問我」降為左下角文字鈕。選項是單選卡片，點一下只是選，不會誤送。</div>
+    <div><strong>資訊（版型不寫死）：</strong>AI 照常寫 Markdown，只多兩種區塊：<code>```stats</code>（數字卡，一列一張）與 <code>```chart</code>（圖表，資料寫成「名稱: 數字 數字 …」一行一條線，或表格）。區塊要幾個、什麼順序、要不要都由內容決定；圖片用一般 Markdown 圖片語法，連續的圖自動變圖庫；完全沒有證據時面板自動變單欄只做決定。四題分別示範：數字卡＋折線＋長條／折線＋表格／素材圖庫／什麼都沒有。點「看 AI 送來的原文」可以看到每題實際要寫多少字。</div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ═══════════════ 尺寸與常數 ═══════════════
+  const W = 1440, H = 900
+  const T = 32, PAD = 14, M = 40
+  const R_CAP = 12, R_SH = 7, R_IN = 14, R_PANEL = 28, RC_TEXT = 10
+  const ICON = 18, FONT = 12, TRACK = 1.5
+  const NS = 'http://www.w3.org/2000/svg'
+  const CLAUDE_PATH = 'M52.4285 162.873L98.7844 136.879L99.5485 134.602L98.7844 133.334H96.4921L88.7237 132.862L62.2346 132.153L39.3113 131.207L17.0249 130.026L11.4214 128.844L6.2 121.873L6.7094 118.447L11.4214 115.257L18.171 115.847L33.0711 116.911L55.485 118.447L71.6586 119.392L95.728 121.873H99.5485L100.058 120.337L98.7844 119.392L97.7656 118.447L74.5877 102.732L49.4995 86.1905L36.3823 76.62L29.3779 71.7757L25.8121 67.2858L24.2839 57.3608L30.6515 50.2716L39.3113 50.8623L41.4763 51.4531L50.2636 58.1879L68.9842 72.7209L93.4357 90.6804L97.0015 93.6343L98.4374 92.6652L98.6571 91.9801L97.0015 89.2625L83.757 65.2772L69.621 40.8192L63.2534 30.6579L61.5978 24.632C60.9565 22.1032 60.579 20.0111 60.579 17.4246L67.8381 7.49965L71.9133 6.19995L81.7193 7.49965L85.7946 11.0443L91.9074 24.9865L101.714 46.8451L116.996 76.62L121.453 85.4816L123.873 93.6343L124.764 96.1155H126.292V94.6976L127.566 77.9197L129.858 57.3608L132.15 30.8942L132.915 23.4505L136.608 14.4708L143.994 9.62643L149.725 12.344L154.437 19.0788L153.8 23.4505L150.998 41.6463L145.522 70.1215L141.957 89.2625H143.994L146.414 86.7813L156.093 74.0206L172.266 53.698L179.398 45.6635L187.803 36.802L193.152 32.5484H203.34L210.726 43.6549L207.415 55.1159L196.972 68.3492L188.312 79.5739L175.896 96.2095L168.191 109.585L168.882 110.689L170.738 110.53L198.755 104.504L213.91 101.787L231.994 98.7149L240.144 102.496L241.036 106.395L237.852 114.311L218.495 119.037L195.826 123.645L162.07 131.592L161.696 131.893L162.137 132.547L177.36 133.925L183.855 134.279H199.774L229.447 136.524L237.215 141.605L241.8 147.867L241.036 152.711L229.065 158.737L213.019 154.956L175.45 145.977L162.587 142.787H160.805V143.85L171.502 154.366L191.242 172.089L215.82 195.011L217.094 200.682L213.91 205.172L210.599 204.699L188.949 188.394L180.544 181.069L161.696 165.118H160.422V166.772L164.752 173.152L187.803 207.771L188.949 218.405L187.294 221.832L181.308 223.959L174.813 222.777L161.187 203.754L147.305 182.486L136.098 163.345L134.745 164.2L128.075 235.42L125.019 239.082L117.887 241.8L111.902 237.31L108.718 229.984L111.902 215.452L115.722 196.547L118.779 181.541L121.58 162.873L123.291 156.636L123.14 156.219L121.773 156.449L107.699 175.752L86.304 204.699L69.3663 222.777L65.291 224.431L58.2867 220.768L58.9235 214.27L62.8713 208.48L86.304 178.705L100.44 160.155L109.551 149.507L109.462 147.967L108.959 147.924L46.6977 188.512L35.6182 189.93L30.7788 185.44L31.4156 178.115L33.7079 175.752L52.4285 162.873Z'
+  const $ = (id) => document.getElementById(id)
+  const display = $('display'), shapeSvg = $('shape'), fill = $('shapeFill'), hit = $('notchHit')
+  const panel = $('panel'), desktop = $('desktop'), fly = $('fly'), toast = $('toast')
+  display.style.width = W + 'px'; display.style.height = H + 'px'
+  shapeSvg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+  const lerp = (a, b, t) => a + (b - a) * t
+  const mod = (v, m) => ((v % m) + m) % m
+
+  // ═══════════════ 幾何工具 ═══════════════
+  function arcPts(c, p0, p1, n = 10) {
+    const r = Math.hypot(p0.x - c.x, p0.y - c.y) || 0.0001
+    const v0 = { x: (p0.x - c.x) / r, y: (p0.y - c.y) / r }, v1 = { x: (p1.x - c.x) / r, y: (p1.y - c.y) / r }
+    const out = []
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      const x = v0.x * (1 - t) + v1.x * t, y = v0.y * (1 - t) + v1.y * t, l = Math.hypot(x, y) || 1
+      out.push({ x: c.x + (x / l) * r, y: c.y + (y / l) * r })
+    }
+    return out
+  }
+  const polyD = (pts) => 'M' + pts.map((p) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join('L') + 'Z'
+  // 右下角可圓角的矩形（x0,y0 在螢幕外，所以只有內側兩個角需要圓角）
+  function rectPath(x0, y0, x1, y1, rBR, rTR = 0, rBL = 0) {
+    const pts = [{ x: x0, y: y0 }]
+    if (rTR > 0.3) pts.push(...arcPts({ x: x1 - rTR, y: y0 + rTR }, { x: x1 - rTR, y: y0 }, { x: x1, y: y0 + rTR }))
+    else pts.push({ x: x1, y: y0 })
+    if (rBR > 0.3) pts.push(...arcPts({ x: x1 - rBR, y: y1 - rBR }, { x: x1, y: y1 - rBR }, { x: x1 - rBR, y: y1 }))
+    else pts.push({ x: x1, y: y1 })
+    if (rBL > 0.3) pts.push(...arcPts({ x: x0 + rBL, y: y1 - rBL }, { x: x0 + rBL, y: y1 }, { x: x0, y: y1 - rBL }))
+    else pts.push({ x: x0, y: y1 })
+    return polyD(pts)
+  }
+  // 反向圓角（凹角補料）：在點 q 往 d 方向（對角單位向量）補一塊「正方形減四分之一圓」
+  function filletPath(q, d, r) {
+    if (r < 0.3) return null
+    const c = { x: q.x + d.x * r, y: q.y + d.y * r }
+    return polyD([{ x: q.x - d.x, y: q.y - d.y }, { x: q.x + d.x * r, y: q.y - d.y }, ...arcPts(c, { x: q.x + d.x * r, y: q.y }, { x: q.x, y: q.y + d.y * r }), { x: q.x - d.x, y: q.y + d.y * r }])
+  }
+
+  // ═══════════════ 瀏海 → 面板的形狀（連續） ═══════════════
+  // pA：沿邊延伸進度；pB：往內展開進度
+  function shapeAt(anchor, pA, pB, notch) {
+    const out = []
+    if (anchor === 'left') {
+      const u0 = lerp(notch.u0, PAD, pA), u1 = lerp(notch.u1, H - PAD, pA)
+      const depth = lerp(T, W - PAD, pB)
+      const rCap = Math.min(lerp(R_CAP, R_PANEL, pB), (u1 - u0) / 2, depth)
+      out.push(rectPath(-M, u0, depth, u1, rCap, rCap, 0).replace(/^M[^L]+/, `M${-M} ${u0}`))
+      // 上下肩（與左邊框交界的反向圓角）
+      const rTop = Math.min(R_SH, u0), rBot = Math.min(R_SH, H - u1)
+      out.push(filletPath({ x: 0, y: u0 }, { x: 1, y: -1 }, rTop))
+      out.push(filletPath({ x: 0, y: u1 }, { x: 1, y: 1 }, rBot))
+      return { paths: out.filter(Boolean), content: { x: 0, y: u0, w: depth, h: u1 - u0 } }
+    }
+    // 左上角 L：上臂（沿上緣）＋左臂（沿左緣）＋從角落長大的核心矩形
+    const x1 = lerp(notch.x1, W - PAD, pA), y1 = lerp(notch.y1, H - PAD, pA)
+    const w = lerp(T, W - PAD, pB), h = lerp(T, H - PAD, pB)
+    out.push(rectPath(-M, -M, x1, T, Math.min(R_CAP, x1 - T)))          // 上臂
+    out.push(rectPath(-M, -M, T, y1, Math.min(R_CAP, y1 - T)))          // 左臂
+    const rCore = Math.min(R_PANEL, Math.max(0, w - T), Math.max(0, h - T))
+    out.push(rectPath(-M, -M, w, h, rCore))                              // 核心
+    out.push(filletPath({ x: T, y: T }, { x: 1, y: 1 }, Math.min(R_IN, x1 - T, y1 - T)))
+    out.push(filletPath({ x: w, y: T }, { x: 1, y: 1 }, Math.max(0, Math.min(R_IN, x1 - w - R_CAP, h - T - rCore))))
+    out.push(filletPath({ x: T, y: h }, { x: 1, y: 1 }, Math.max(0, Math.min(R_IN, y1 - h - R_CAP, w - T - rCore))))
+    out.push(filletPath({ x: x1, y: 0 }, { x: 1, y: 1 }, Math.min(R_SH, W - x1)))   // 上臂肩
+    out.push(filletPath({ x: 0, y: y1 }, { x: 1, y: 1 }, Math.min(R_SH, H - y1)))   // 左臂肩
+    return { paths: out.filter(Boolean), content: { x: 0, y: 0, w, h } }
+  }
+
+  // ═══════════════ 瀏海文字（靜止時） ═══════════════
+  const measure = document.createElement('canvas').getContext('2d')
+  measure.font = `${FONT}px "Geist Sans", "PingFang TC", sans-serif`
+  function tokenize(text) {
+    return (text.match(/[A-Za-z0-9:./%+\-]+|\s+|./gu) || []).map((s) => {
+      if (/^\s+$/.test(s)) return { s, kind: 'space', adv: 5 }
+      if (/^[A-Za-z0-9:./%+\-]+$/.test(s)) return { s, kind: 'latin', adv: measure.measureText(s).width + TRACK }
+      return { s, kind: 'cjk', adv: FONT + TRACK }
+    })
+  }
+  function restLength(text) { return Math.ceil(tokenize(text).reduce((n, t) => n + t.adv, 0) + T / 2 + ICON / 2 + 19) }
+  // 簡化的文字路徑：左側直帶（由上往下）、左上角 L（上臂由右往左，再沿小圓弧往下）
+  function notchTextPath(anchor, notch) {
+    if (anchor === 'left') {
+      const a = { x: T / 2, y: notch.u0 + T / 2 }, b = { x: T / 2, y: notch.u1 - T / 2 }
+      return pathFrom([{ type: 'line', a, b }])
+    }
+    const r = RC_TEXT
+    const a = { x: notch.x1 - T / 2, y: T / 2 }, k = { x: T / 2, y: T / 2 }, e = { x: T / 2, y: notch.y1 - T / 2 }
+    return pathFrom([
+      { type: 'line', a, b: { x: k.x + r, y: k.y } },
+      { type: 'arc', c: { x: k.x + r, y: k.y + r }, r, a0: -Math.PI / 2, da: -Math.PI / 2 },
+      { type: 'line', a: { x: k.x, y: k.y + r }, b: e },
+    ])
+  }
+  function pathFrom(prims) {
+    prims.forEach((p) => {
+      if (p.type === 'line') { p.len = Math.hypot(p.b.x - p.a.x, p.b.y - p.a.y); p.dir = { x: (p.b.x - p.a.x) / p.len, y: (p.b.y - p.a.y) / p.len }; p.vertical = Math.abs(p.dir.y) > .5 }
+      else p.len = Math.abs(p.da) * p.r
+    })
+    const total = prims.reduce((n, p) => n + p.len, 0)
+    function at(d) {
+      if (d < 0) { const p = prims[0]; return { x: p.a.x + p.dir.x * d, y: p.a.y + p.dir.y * d, vertical: p.vertical, arc: null } }
+      for (const p of prims) {
+        if (d <= p.len || p === prims[prims.length - 1]) {
+          const t = p.len ? Math.min(d, p.len) / p.len : 0
+          if (p.type === 'line') return { x: p.a.x + (p.b.x - p.a.x) * t + (d > p.len ? p.dir.x * (d - p.len) : 0), y: p.a.y + (p.b.y - p.a.y) * t + (d > p.len ? p.dir.y * (d - p.len) : 0), vertical: p.vertical, arc: null }
+          const ang = p.a0 + p.da * t
+          return { x: p.c.x + p.r * Math.cos(ang), y: p.c.y + p.r * Math.sin(ang), arc: { t, turn: Math.sign(p.da) } }
+        }
+        d -= p.len
+      }
+    }
+    return { total, at }
+  }
+
+  // ═══════════════ 圖示 ═══════════════
+  function markSvg(agent, size) {
+    if (agent === 'claude') return `<svg viewBox="0 0 248 248" width="${size}" height="${size}" aria-hidden="true"><path d="${CLAUDE_PATH}" fill="#D97757"/></svg>`
+    let c = ''
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; c += `<circle cx="${(12 + Math.cos(a) * 6.2).toFixed(2)}" cy="${(12 + Math.sin(a) * 6.2).toFixed(2)}" r="4.6" fill="url(#codexFillP)"/>` }
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><defs><linearGradient id="codexFillP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a8f6"/><stop offset=".55" stop-color="#6c78f5"/><stop offset="1" stop-color="#3430ef"/></linearGradient></defs>${c}<circle cx="12" cy="12" r="7.2" fill="url(#codexFillP)"/><path d="M8.4 9.2 L10.9 12 L8.4 14.8 M12.6 14.8 H16" fill="none" stroke="#f2f3ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  }
+
+  // ═══════════════ 題目資料：AI 只寫 Markdown，外加兩種資料區塊 ```stats 與 ```chart ═══════════════
+  // 版型不寫死：區塊數量、順序、有無都由內容決定；body 為空時面板自動改成單欄「只做決定」。
+  const fmt = (n) => n.toLocaleString('en-US')
+  const QUESTIONS = [
+    {
+      id: 'pa-acme-restart', agent: 'claude', agentName: 'Claude',
+      src: { task: '每日廣告復盤', trigger: '排程', asked: '09:32', host: 'Claude App' },
+      ask: 'Acme 廣告停了 18 天，要重啟還是正式收攤？',
+      conseq: [['不決的後果', '本月 NT$24,000 預算繼續閒置'], ['期限', '今天 18:00 前']],
+      cycle: { remaining: 702 },
+      why: [
+        '每日復盤發現 Acme 從 9/21 停投到現在，停投前名單成本已經漲到 NT$412。重啟或收攤會改變本月預算分配，超出 AI 能自己決定的範圍。',
+        '',
+        '1. 09:30 讀取 Meta 後台與 Stripe 近 45 天數據',
+        '2. 09:31 發現停投前兩週名單成本上升 38%',
+        '3. 09:32 試算「重啟測 3 天」與「收攤轉預算」兩案',
+        '4. 現在 等你決定',
+      ].join('\n'),
+      body: [
+        '```stats',
+        '| 名單成本 | NT$412 | +38% 差 | 較前 14 天 | 298 305 312 330 341 352 360 371 385 392 401 412 |',
+        '| 名單數 | 62 | -41% 差 | 較前 14 天 | 12 11 12 10 9 9 8 7 7 6 5 4 |',
+        '| 已停投 | 18 天 | | 自 9/21 起 | |',
+        '| 未分配預算 | NT$24,000 | | 占本月 40% | |',
+        '```',
+        '',
+        '```chart line title="每日名單數" sub="近 45 天・Meta 後台" x="8/25~10/8" unit=筆 band="9/21~10/8:停投 18 天"',
+        '名單數: 12 11 13 10 12 9 11 10 9 8 9 7 8 6 7 6 5 6 4 5 4 3 4 2 3 2 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0',
+        '```',
+        '',
+        '```chart bar title="各素材名單成本" sub="停投前 14 天・越短越好" unit=NT$',
+        '| 素材 A｜一人公司的 AI 行銷 | 380 |',
+        '| 素材 B｜三步驟做出第一支廣告 | 455 |',
+        '| 素材 C｜我怎麼用 Claude 寫文案 | 610 |',
+        '```',
+      ].join('\n'),
+      kind: 'choice',
+      options: [
+        { id: 'restart', label: '重啟，先測 3 天', detail: '只用素材 A、日預算 NT$800，看名單成本能不能回到 NT$400 以下', tags: ['3 天上限 NT$2,400', '可隨時停'], reco: true },
+        { id: 'close', label: '正式收攤', detail: '把 NT$24,000 移給 Demo 課，Acme 改靠自然流量', tags: ['可逆', '學習期歸零'] },
+        { id: 'wait', label: '再觀察一週', detail: '維持停投，下週一再問你', tags: ['預算繼續閒置'] },
+      ],
+      notePh: '補充（選填）：例如「重啟，但預算先 NT$600」',
+      receipt: '已交給等待中的原對話（Claude App 的「每日廣告復盤」）',
+    },
+    {
+      id: 'pa-ios-budget-2400', agent: 'codex', agentName: 'Codex',
+      src: { task: 'Demo 課投放優化', trigger: '排程', asked: '09:35', host: 'Codex App' },
+      ask: 'Demo 課日預算 2,000 → 2,400，要批准嗎？',
+      conseq: [['不決的後果', '維持 NT$2,000，不會自動加碼'], ['期限', '今天 12:00 前']],
+      cycle: { remaining: 812 },
+      money: { params: 'Demo 課・Advantage+ 購物・日預算 NT$2,000 → NT$2,400（+20%）・可逆', note: '批准後由 Kunsu 錢鏈執行；這段對話不會直接動錢' },
+      why: [
+        '近 14 天 ROAS 穩定在目標 3.0 以上，單次購買成本下降 9%。依你的加碼規則（ROAS 連 7 天 ≥ 3.0 可加 20%），這次動錢需要你批准。',
+        '',
+        '1. 09:33 讀取近 14 天 Demo 課投放與 Stripe 訂單',
+        '2. 09:34 確認 ROAS 連續 7 天 ≥ 3.0',
+        '3. 09:35 建立預測檔：加碼後 ROAS 預期 3.0–3.3',
+        '4. 現在 等你批准',
+      ].join('\n'),
+      body: [
+        '```chart line title="ROAS" sub="近 14 天・Meta 後台" x="9/25~10/8" target="3:目標 3.0"',
+        'ROAS: 2.6 2.8 2.7 2.9 3.1 3.0 3.2 3.3 3.1 3.4 3.5 3.3 3.6 3.4',
+        '```',
+        '',
+        '| 情境 | 日預算 | 預期 ROAS | 預期購買／週 |',
+        '|---|---|---|---|',
+        '| 維持 | NT$2,000 | 3.4 | 41 |',
+        '| +10% | NT$2,200 | 3.2–3.4 | 44 |',
+        '| **+20%（建議）** | **NT$2,400** | **3.0–3.3** | **47** |',
+      ].join('\n'),
+      kind: 'choice',
+      options: [
+        { id: 'approve', label: '批准 +20%（NT$2,400）', detail: '依加碼規則；3 天後自動復盤', tags: ['可逆', '每日多 NT$400'], reco: true },
+        { id: 'half', label: '改成 +10%（NT$2,200）', detail: '保守加碼，學習期影響較小', tags: ['可逆', '每日多 NT$200'] },
+        { id: 'keep', label: '先不調整', detail: '維持 NT$2,000，下次復盤再看', tags: ['安全預設'] },
+      ],
+      notePh: '補充（選填）',
+      receipt: '已在原對話追加處理（Codex App 的「Demo 課投放優化」）',
+    },
+    {
+      id: 'kongko-batch-1008', agent: 'claude', agentName: 'Claude',
+      src: { task: 'Kongko 素材產線', trigger: '互動', asked: '14:03', host: 'Claude App' },
+      ask: 'Kongko 新做了 4 張素材，哪些可以上架？',
+      conseq: [['不決的後果', '新素材不上架，舊素材繼續疲乏'], ['期限', '明天 10:00 前']],
+      cycle: { remaining: 655 },
+      why: [
+        'Kongko 依上週勝出的切角做了 4 張新素材。上架就會開始花錢測試，所以要你先過審。',
+        '',
+        '1. 14:02 Kongko 批次產圖完成',
+        '2. 14:03 AI 檢查品牌規範與錯字：全部通過',
+        '3. 現在 等你過審',
+      ].join('\n'),
+      body: [
+        '![A｜一人公司的 AI 行銷](demo:1 "延續勝出切角")',
+        '![B｜三步驟做出第一支廣告](demo:2 "新切角")',
+        '![C｜我怎麼用 Claude 寫文案](demo:3 "舊切角改版")',
+        '![D｜每天省 2 小時的行銷流程](demo:4 "新切角")',
+        '',
+        '上週勝出的是「一人公司」切角（名單成本 NT$380）。**B 和 D 是新切角**，風險較高，但可能找到新受眾。',
+      ].join('\n'),
+      kind: 'choice',
+      options: [
+        { id: 'all', label: '全部上架', detail: '新舊切角一起測，3 天後看哪張留下', tags: ['測試預算 NT$2,000'], reco: true },
+        { id: 'safe', label: '只上 A 和 C', detail: '保守：只延續已驗證的切角', tags: ['測試預算 NT$1,000'] },
+        { id: 'redo', label: '全部重做', detail: '退回 Kongko，在補充說明寫你要改什麼', tags: ['延後 1 天'] },
+      ],
+      notePh: '補充（選填）：例如「D 的標題太長，改短再上」',
+      receipt: '已交給等待中的原對話（Claude App 的 Kongko 素材產線）',
+    },
+    {
+      id: 'rt-daily-journal-20261008', agent: 'claude', agentName: 'Claude',
+      src: { task: '每日日記督導', trigger: '排程 21:30', asked: '21:30', host: 'Claude App' },
+      ask: '今天最重要的三件事是什麼？哪一件沒做到？',
+      conseq: [['這是你設定的承諾', '每天寫日記，讓 AI 幫你復盤'], ['連續', '已寫 22 天，昨天漏了']],
+      cycle: { remaining: 540 },
+      why: [
+        '這是你在 Claude 排程設定的每日日記督導。寫完後 AI 會整理進 vault 的日記，並給你明天的一個建議。',
+        '',
+        '> 昨天的 AI 回饋：你提到想先把 Kunsu 做完再休息，但連續三天睡不到 6 小時。建議今天 23:00 前收工，把最難的事放在早上。',
+      ].join('\n'),
+      body: '',
+      kind: 'text',
+      notePh: '1. …\n2. …\n3. …\n沒做到的是：…',
+      receipt: '已交給等待中的原對話（Claude App 的「每日日記督導」）',
+    },
+  ]
+
+  // ═══════════════ 內容語法解析（Markdown 子集） ═══════════════
+  const SERIES = ['#3987e5', '#d95926', '#199e70', '#c98500']   // dark 類別色前 4 格，已對 #0b0c0e 驗證
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const inline = (s) => esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="md-link">$1</span>')
+  const START = /^(```|\s*\||>|#{1,3}\s|\s*(\d+\.|-)\s)/
+  function parseMd(md) {
+    const lines = String(md || '').replace(/\r/g, '').split('\n'), out = []
+    let i = 0
+    while (i < lines.length) {
+      const line = lines[i]
+      if (!line.trim()) { i++; continue }
+      if (line.startsWith('```')) {
+        const info = line.slice(3).trim(), body = []; i++
+        while (i < lines.length && !lines[i].startsWith('```')) body.push(lines[i++])
+        i++; out.push({ type: 'fence', ...parseInfo(info), lines: body }); continue
+      }
+      if (line.trim().startsWith('|')) {
+        const rows = []
+        while (i < lines.length && lines[i].trim().startsWith('|')) rows.push(lines[i++])
+        out.push({ type: 'table', rows }); continue
+      }
+      if (/^\s*(\d+\.|-)\s+/.test(line)) {
+        const items = []
+        while (i < lines.length && /^\s*(\d+\.|-)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*(\d+\.|-)\s+/, ''))
+        out.push({ type: 'list', items }); continue
+      }
+      if (line.startsWith('>')) {
+        const q = []
+        while (i < lines.length && lines[i].startsWith('>')) q.push(lines[i++].replace(/^>\s?/, ''))
+        out.push({ type: 'quote', text: q.join(' ') }); continue
+      }
+      if (/^#{1,3}\s/.test(line)) { out.push({ type: 'heading', text: line.replace(/^#+\s/, '') }); i++; continue }
+      const para = [line]; i++
+      while (i < lines.length && lines[i].trim() && !START.test(lines[i])) para.push(lines[i++])
+      const text = para.join(' ')
+      if (/^(\s*!\[[^\]]*\]\([^)]*\)\s*)+$/.test(text)) {
+        out.push({ type: 'gallery', imgs: [...text.matchAll(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g)].map((m) => ({ alt: m[1], src: m[2], title: m[3] || '' })) })
+      } else out.push({ type: 'para', text })
+    }
+    return out
+  }
+  function parseInfo(info) {
+    const m = info.match(/^(\w+)\s*(.*)$/) || [null, info, '']
+    const opts = {}, rest = m[2] || ''
+    const re = /(\w+)=("([^"]*)"|\S+)|(\S+)/g
+    let x
+    while ((x = re.exec(rest))) { if (x[1]) opts[x[1]] = x[3] !== undefined ? x[3] : x[2]; else if (!opts.type) opts.type = x[4] }
+    return { kind: m[1], opts }
+  }
+  function rowsOf(lines) {
+    return lines.filter((l) => l.trim() && !/^\s*\|?\s*:?-{2,}/.test(l)).map((l) =>
+      l.includes('|') ? l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()) : l.split(',').map((c) => c.trim()))
+  }
+  const num = (c) => parseFloat(String(c ?? '').replace(/[^\d.-]/g, ''))
+  function expandX(spec, n) {
+    if (!spec) return Array.from({ length: n }, (_, i) => String(i + 1))
+    if (spec.includes('~')) {
+      const [a, b] = spec.split('~'), [am, ad] = a.split('/').map(Number), [bm, bd] = b.split('/').map(Number)
+      const d = new Date(2026, am - 1, ad), end = new Date(2026, bm - 1, bd), out = []
+      while (d <= end) { out.push(`${d.getMonth() + 1}/${d.getDate()}`); d.setDate(d.getDate() + 1) }
+      return out
+    }
+    return spec.split(',').map((s) => s.trim())
+  }
+  // 資料兩種寫法：「名稱: 數字 數字 …」一行一條線（最省字），或表格列（第一欄是 x）
+  function chartData(opts, lines) {
+    const sl = lines.filter((l) => /^[^|,]+:\s*[-\d.\s]+$/.test(l.trim()))
+    if (sl.length) {
+      const series = sl.map((l) => { const k = l.indexOf(':'); return { name: l.slice(0, k).trim(), values: l.slice(k + 1).trim().split(/\s+/).map(Number) } })
+      return { x: expandX(opts.x, series[0].values.length), series }
+    }
+    const rows = rowsOf(lines)
+    let names = null
+    if (rows.length && isNaN(num(rows[0][1]))) names = rows.shift().slice(1)
+    names = names || rows[0].slice(1).map((_, j) => j === 0 ? (opts.title || '數值') : `系列 ${j + 1}`)
+    return { x: rows.map((r) => r[0]), series: names.slice(0, 4).map((n, j) => ({ name: n, values: rows.map((r) => num(r[j + 1])) })) }
+  }
+  const isDateLike = (s) => /^\d{1,2}\/\d{1,2}$|^\d{4}-\d{2}-\d{2}$|^\d{1,2}:\d{2}$|^週[一二三四五六日]$/.test(s)
+  const fmtVal = (v, unit, dec) => { const n = dec ? v.toFixed(dec) : fmt(Math.round(v)); return /^(NT\$|\$)$/.test(unit || '') ? unit + n : n + (unit || '') }
+
+  // ═══════════════ 區塊繪製（依 dataviz 規範：2px 線、髮絲格線、選擇性標籤、hover、表格分身） ═══════════════
+  function sparkSvg(vals) {
+    const w = 120, h = 26, min = Math.min(...vals), max = Math.max(...vals)
+    const pts = vals.map((v, i) => [i / (vals.length - 1) * (w - 6) + 3, h - 4 - (max === min ? 0.5 : (v - min) / (max - min)) * (h - 8)])
+    const last = pts[pts.length - 1]
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#5f6570" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/></svg>`
+  }
+  function statsBlock(lines) {
+    const rows = rowsOf(lines)
+    return `<div class="stats">${rows.map(([label, value, change = '', note = '', trend = '']) => {
+      const tone = /差/.test(change) ? 'bad' : /好/.test(change) ? 'good' : ''
+      const pct = change.replace(/[好差]/g, '').trim()
+      const arrow = pct.startsWith('-') ? '▼ ' + pct.slice(1) : pct ? '▲ ' + pct.replace(/^\+/, '') : ''
+      const spark = trend.trim() ? trend.trim().split(/\s+/).map(Number) : null
+      return `<div class="stat"><div class="lbl">${esc(label)}</div><div class="val">${esc(value)}</div>
+        <div class="delta">${arrow ? `<b data-tone="${tone}">${arrow}</b> ` : ''}${esc(note)}${tone ? `・${tone === 'bad' ? '變差' : '變好'}` : ''}</div>
+        ${spark ? sparkSvg(spark) : ''}</div>`
+    }).join('')}</div>`
+  }
+  function niceScale(lo, hi, zero) {
+    if (zero) lo = Math.min(0, lo)
+    const raw = (hi - lo) / 4 || 1, p = Math.pow(10, Math.floor(Math.log10(raw)))
+    const step = [1, 2, 5, 10].map((m) => m * p).find((v) => v >= raw)
+    const min = zero ? 0 : Math.floor(lo / step) * step
+    const max = Math.max(min + step * 4, Math.ceil(hi / step) * step)
+    return { min, max, step }
+  }
+  function lineChart(opts, data, uid) {
+    const w = 720, h = 210, l = 44, r = 64, t = 20, bt = 28, pw = w - l - r, ph = h - t - bt
+    const all = data.series.flatMap((s) => s.values)
+    const dec = all.some((v) => !Number.isInteger(v)) ? 1 : 0
+    const target = opts.target ? { value: num(opts.target.split(':')[0]), label: opts.target.split(':')[1] || '' } : null
+    const sc = niceScale(Math.min(...all, target ? target.value : Infinity), Math.max(...all, target ? target.value : -Infinity), !dec && !target)
+    const n = data.x.length, X = (i) => l + i / (n - 1) * pw, Y = (v) => t + ph - (v - sc.min) / (sc.max - sc.min) * ph
+    let g = ''
+    for (let v = sc.min; v <= sc.max + 1e-9; v += sc.step) {
+      g += `<line x1="${l}" x2="${w - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === sc.min ? '#383835' : '#1f2227'}"/>`
+      g += `<text x="${l - 8}" y="${Y(v)}" text-anchor="end" dominant-baseline="central" font-size="11" fill="#8b919b" style="font-variant-numeric:tabular-nums">${dec ? v.toFixed(1) : fmt(Math.round(v))}</text>`
+    }
+    const step = Math.ceil(n / 6)
+    data.x.forEach((d, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${X(i)}" y="${h - 8}" text-anchor="middle" font-size="11" fill="#8b919b" style="font-variant-numeric:tabular-nums">${esc(d)}</text>` })
+    if (opts.band) {
+      const [range, label] = opts.band.split(':'), [a, b] = range.split('~'), i0 = data.x.indexOf(a), i1 = data.x.indexOf(b)
+      if (i0 >= 0 && i1 >= 0) {
+        g += `<rect x="${X(i0)}" y="${t}" width="${X(i1) - X(i0)}" height="${ph}" fill="rgba(255,255,255,.035)"/><line x1="${X(i0)}" x2="${X(i0)}" y1="${t}" y2="${t + ph}" stroke="#2a2e35"/>`
+        g += `<text x="${(X(i0) + X(i1)) / 2}" y="${t + 14}" text-anchor="middle" font-size="12" fill="#c3c7ce">${esc(label || '')}</text>`
+      }
+    }
+    if (target) g += `<line x1="${l}" x2="${w - r}" y1="${Y(target.value)}" y2="${Y(target.value)}" stroke="#5f6570"/><text x="${w - r + 6}" y="${Y(target.value)}" dominant-baseline="central" font-size="11" fill="#8b919b">${esc(target.label)}</text>`
+    data.series.forEach((s, k) => {
+      const pts = s.values.map((v, i) => `${X(i).toFixed(1)} ${Y(v).toFixed(1)}`)
+      const d = 'M' + pts.join('L')
+      if (data.series.length === 1) g += `<path d="${d}L${X(n - 1)} ${Y(sc.min)}L${X(0)} ${Y(sc.min)}Z" fill="var(--accent-wash)"/>`
+      g += `<path class="draw" d="${d}" fill="none" stroke="${SERIES[k]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>`
+      const lv = s.values[n - 1]
+      g += `<circle cx="${X(n - 1)}" cy="${Y(lv)}" r="4" fill="${SERIES[k]}" stroke="var(--card)" stroke-width="2"/>`
+      if (!target || data.series.length > 1) g += `<text x="${X(n - 1) + 10}" y="${Y(lv)}" dominant-baseline="central" font-size="12" fill="#f2f3f5">${fmtVal(lv, opts.unit, dec)}</text>`
+    })
+    g += `<line class="xhair" x1="0" x2="0" y1="${t}" y2="${t + ph}" stroke="#8b919b" opacity="0"/>`
+    data.series.forEach((s, k) => { g += `<circle class="xdot" data-k="${k}" r="4" fill="${SERIES[k]}" stroke="var(--card)" stroke-width="2" opacity="0"/>` })
+    g += `<rect class="hitbox" x="${l}" y="${t}" width="${pw}" height="${ph}" fill="transparent"/>`
+    const legend = data.series.length > 1 ? `<div class="legend">${data.series.map((s, k) => `<span><i style="background:${SERIES[k]}"></i>${esc(s.name)}</span>`).join('')}</div>` : ''
+    const meta = { l, pw, t, ph, n, min: sc.min, max: sc.max, x: data.x, series: data.series, unit: opts.unit || '', dec }
+    return chartCard(opts, uid, legend + `<svg viewBox="0 0 ${w} ${h}" data-line='${esc(JSON.stringify(meta))}'>${g}</svg>`, data)
+  }
+  function barChart(opts, data, uid) {
+    const s = data.series[0], w = 680, rowH = 46, h = data.x.length * rowH
+    const max = niceScale(0, Math.max(...s.values), true).max
+    let g = ''
+    data.x.forEach((name, i) => {
+      const y = i * rowH, v = s.values[i], bw = Math.max(4, v / max * (w - 90))
+      g += `<text x="0" y="${y + 12}" font-size="12" fill="#c3c7ce">${esc(name)}</text>`
+      g += `<path class="grow" d="M0 ${y + 20}H${bw - 4}a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4H0Z" fill="var(--accent)" data-v="${fmtVal(v, opts.unit, 0)}" data-name="${esc(name)}"/>`
+      g += `<text x="${bw + 8}" y="${y + 28}" dominant-baseline="central" font-size="12" fill="#f2f3f5" style="font-variant-numeric:tabular-nums">${fmtVal(v, opts.unit, 0)}</text>`
+    })
+    return chartCard(opts, uid, `<svg viewBox="0 0 ${w} ${h}" data-bars="1">${g}</svg>`, data)
+  }
+  function chartCard(opts, uid, inner, data) {
+    const head = `<tr><th></th>${data.series.map((s) => `<th>${esc(s.name)}</th>`).join('')}</tr>`
+    const rows = data.x.map((x, i) => `<tr><td>${esc(x)}</td>${data.series.map((s) => `<td>${fmtVal(s.values[i], opts.unit, s.values.some((v) => !Number.isInteger(v)) ? 1 : 0)}</td>`).join('')}</tr>`).join('')
+    return `<div class="card">
+      <div class="chart-head"><div><div class="chart-title">${esc(opts.title || '')}</div>${opts.sub ? `<div class="chart-sub">${esc(opts.sub)}</div>` : ''}</div><button class="link-btn" data-table="${uid}">看表格</button></div>
+      <div class="chart-wrap">${inner}<div class="tip"></div></div>
+      <div class="table-view" id="tv-${uid}"><table><thead>${head}</thead><tbody>${rows}</tbody></table></div></div>`
+  }
+  const DEMO_IMG = {
+    'demo:1': 'linear-gradient(160deg,#1f3b5a,#3d6d9e 60%,#8fb3d9)', 'demo:2': 'linear-gradient(160deg,#3a2a1f,#8a5a3c 60%,#d9a38f)',
+    'demo:3': 'linear-gradient(160deg,#20202a,#4b4b6b 60%,#a3a3c9)', 'demo:4': 'linear-gradient(160deg,#1d3a2c,#3f7a5c 60%,#9fd3b4)',
+  }
+  function galleryBlock(b, large) {
+    return `<div class="card"><div class="shots" data-large="${large}">${b.imgs.map((im) => {
+      const [name, ...rest] = im.alt.split('｜')
+      return `<figure class="shot"><div class="img" style="background:${DEMO_IMG[im.src] || '#222'}">${esc(rest.join('｜') || name)}</div><figcaption>${esc(name)}${im.title ? ` <span>· ${esc(im.title)}</span>` : ''}</figcaption></figure>`
+    }).join('')}</div></div>`
+  }
+  function tableBlock(b) {
+    const rows = rowsOf(b.rows), head = rows.shift() || []
+    return `<div class="card md-table"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+  }
+  // 依內容自動排版：連續兩個 size=half 的圖並排；圖庫是唯一主證據時放大
+  function renderBody(q) {
+    const blocks = parseMd(q.body)
+    const visual = blocks.filter((b) => b.type !== 'para' && b.type !== 'heading')
+    let html = '', n = 0, idx = 2
+    for (let k = 0; k < blocks.length; k++) {
+      const b = blocks[k], uid = `${q.id}-${n++}`
+      let part = ''
+      if (b.type === 'fence' && b.kind === 'stats') part = statsBlock(b.lines)
+      else if (b.type === 'fence' && b.kind === 'chart') {
+        const data = chartData(b.opts, b.lines)
+        const type = b.opts.type || (isDateLike(data.x[0]) ? 'line' : 'bar')
+        part = type === 'line' ? lineChart(b.opts, data, uid) : barChart(b.opts, data, uid)
+      }
+      else if (b.type === 'gallery') part = galleryBlock(b, visual.length === 1)
+      else if (b.type === 'table') part = tableBlock(b)
+      else if (b.type === 'para') part = `<p class="md-p">${inline(b.text)}</p>`
+      else if (b.type === 'heading') part = `<h3 class="md-h">${inline(b.text)}</h3>`
+      else if (b.type === 'list') part = `<ul class="md-list">${b.items.map((it) => `<li>${inline(it)}</li>`).join('')}</ul>`
+      else if (b.type === 'quote') part = `<blockquote class="md-quote">${inline(b.text)}</blockquote>`
+      html += `<div class="blk reveal" style="--i:${Math.min(idx++, 6)}">${part}</div>`
+    }
+    return { html, empty: blocks.length === 0 }
+  }
+  // 「為什麼問你」：同一套 Markdown；以時間開頭的清單自動變成時間軸
+  function whyCard(q) {
+    const blocks = parseMd(q.why)
+    const timeRe = /^(\d{1,2}:\d{2}|現在)\s+(.*)$/
+    const inner = blocks.map((b) => {
+      if (b.type === 'list' && b.items.every((it) => timeRe.test(it))) {
+        return `<ol class="steps">${b.items.map((it, i) => { const m = it.match(timeRe); return `<li class="${m[1] === '現在' ? 'now' : ''}"><time>${m[1]}</time><span class="node"></span><span>${inline(m[2])}</span></li>` }).join('')}</ol>`
+      }
+      if (b.type === 'para') return `<p class="why-sum">${inline(b.text)}</p>`
+      if (b.type === 'quote') return `<blockquote class="md-quote">${inline(b.text)}</blockquote>`
+      if (b.type === 'list') return `<ul class="md-list">${b.items.map((it) => `<li>${inline(it)}</li>`).join('')}</ul>`
+      return ''
+    }).join('')
+    const raw = (q.why + (q.body ? '\n\n' + q.body : ''))
+    return `<div class="card reveal" style="--i:1">
+      <div class="sec-label">為什麼問你</div>${inner}
+      <div class="ctx-actions"><button class="link-btn" id="openConv">打開原對話（${q.src.host}）↗</button><button class="link-btn" id="toggleRaw">看 AI 送來的原文</button></div>
+      <pre class="raw" id="raw">${esc(raw)}</pre>
+      <div class="raw-meta" id="rawMeta">共 ${raw.split('\n').length} 行、${raw.length} 字（含題目脈絡與所有圖表資料）</div>
+    </div>`
+  }
+
+  // ═══════════════ 面板內容 ═══════════════
+  const state = {
+    anchor: 'left', reduced: false, slow: false,
+    open: false, animating: false, pA: 0, pB: 0, tStart: 0, dir: 0,
+    qi: 0, answers: {}, selected: null, note: '', done: new Set(), gone: false,
+  }
+  function activeQuestions() { return QUESTIONS.filter((q) => !state.done.has(q.id)) }
+  function mmss(s) { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
+
+  function renderPanel() {
+    const qs = QUESTIONS, q = qs[state.qi]
+    const isDone = state.done.has(q.id)
+    const body = renderBody(q)
+    panel.innerHTML = `
+      <div class="p-head reveal" style="--i:0">
+        <div class="src"><div class="mark-slot" id="markSlot">${markSvg(q.agent, 26)}</div><span class="src-name">${q.agentName}</span>
+          <span class="chip">${q.src.task} · ${q.src.trigger}</span><span class="muted" style="font-size:12px">${q.src.asked} 提出</span></div>
+        <div class="queue" aria-label="題目佇列"><button class="icon-btn" id="prevQ" aria-label="上一題" ${state.qi === 0 ? 'disabled' : ''}>‹</button>
+          <span>第 ${state.qi + 1} 題，共 ${qs.length} 題</span>
+          <div class="dots">${qs.map((x, i) => `<i data-on="${i === state.qi}" data-done="${state.done.has(x.id)}"></i>`).join('')}</div>
+          <button class="icon-btn" id="nextQ" aria-label="下一題" ${state.qi === qs.length - 1 ? 'disabled' : ''}>›</button></div>
+        <div class="head-right">
+          <div class="cycle" aria-label="倒數">${ringSvg(q.cycle.remaining / 900)}<span>${isDone ? '已回答' : `${mmss(q.cycle.remaining)} 後強制詢問`}</span></div>
+          <button class="later" id="later">稍後再問 <kbd>Esc</kbd></button>
+        </div>
+      </div>
+      ${body.empty
+        ? `<div class="p-body focus swap" id="pbody"><div class="decision" id="decision">${whyCard(q)}${isDone ? receiptHtml(q, true) : decisionHtml(q)}</div></div>`
+        : `<div class="p-body swap" id="pbody"><div class="evidence">${whyCard(q)}${body.html}</div>
+           <div class="decision" id="decision">${isDone ? receiptHtml(q, true) : decisionHtml(q)}</div></div>`}`
+    bindPanel()
+  }
+  function ringSvg(frac) {
+    const r = 8, c = 2 * Math.PI * r
+    return `<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="transform:rotate(-90deg)"><circle cx="10" cy="10" r="${r}" fill="none" stroke="#2a2e35" stroke-width="2"/><circle cx="10" cy="10" r="${r}" fill="none" stroke="#c3c7ce" stroke-width="2" stroke-linecap="round" stroke-dasharray="${c * frac} ${c}"/></svg>`
+  }
+  function decisionHtml(q) {
+    const opts = q.kind === 'choice' ? `<div class="opts reveal" style="--i:3" role="radiogroup" aria-label="選項">${q.options.map((o, i) => `
+      <button class="opt" role="radio" aria-checked="${state.selected === o.id}" data-opt="${o.id}">
+        <span class="k">${i + 1}</span>
+        <span class="l">${o.label}${o.reco ? '<span class="reco">AI 建議</span>' : ''}</span>
+        <span class="d">${o.detail}</span>
+        <span class="tags">${o.tags.map((t) => `<span>${t}</span>`).join('')}</span>
+      </button>`).join('')}</div>` : ''
+    const params = q.money ? `<div class="params reveal" style="--i:2"><small>所見即所簽</small>${q.money.params}</div>` : ''
+    const primaryText = q.kind === 'text'
+    return `
+      <div class="reveal" style="--i:1"><div class="ask-label">${q.kind === 'text' ? '要你回應' : '要你決定'}</div><h2 class="ask">${q.ask}</h2>
+        <div class="conseq">${q.conseq.map(([k, v]) => `<span><b>${k}：</b>${v}</span>`).join('')}</div></div>
+      ${params}${opts}
+      <div class="note reveal" style="--i:4" data-primary="${primaryText}"><label for="note">${primaryText ? '你的回答' : '補充說明'}</label>
+        <textarea id="note" placeholder="${q.notePh}">${state.note}</textarea></div>
+      <div class="choice-sum reveal" style="--i:4" id="choiceSum" aria-live="polite"></div>
+      ${q.money ? `<div class="muted reveal" style="--i:4;font-size:12px;margin-top:6px">${q.money.note}</div>` : ''}
+      <div class="foot reveal" style="--i:5">
+        <button class="reject" id="reject">這題不該問我</button>
+        <button class="send" id="send" disabled>${primaryText ? '送出回答' : '送出決定'} <kbd>⏎</kbd></button>
+      </div>`
+  }
+  function receiptHtml(q, already) {
+    const a = state.answers[q.id] || {}
+    return `<div class="ask-label">已送出</div><h2 class="ask">${q.ask}</h2>
+      <div class="rc-final">${a.label ? `<b>${a.label}</b>` : ''}${a.note ? `<div style="color:var(--ink-2);margin-top:6px;white-space:pre-wrap">${a.note}</div>` : ''}</div>
+      <div class="receipt" id="receipt">
+        <div class="rc-row" data-on="${already}"><span class="ic">✓</span><span>已收到<small>${a.at || '09:41'}</small></span></div>
+        <div class="rc-row" data-on="${already}"><span class="ic">✓</span><span>已寫入決策帳本</span></div>
+        <div class="rc-row" data-on="${already}"><span class="ic">✓</span><span>${q.receipt}<small><button class="link-btn">打開原對話 ↗</button></small></span></div>
+      </div>
+      <div class="foot"><span class="muted" style="font-size:12px">${nextUndone() !== -1 ? '即將前往下一題…' : '全部處理完了'}</span>
+        <button class="send" id="afterSend">${nextUndone() !== -1 ? '下一題' : '完成'} <kbd>⏎</kbd></button></div>`
+  }
+  function nextUndone() {
+    for (let k = 1; k <= QUESTIONS.length; k++) { const i = (state.qi + k) % QUESTIONS.length; if (!state.done.has(QUESTIONS[i].id)) return i }
+    return -1
+  }
+  function updateSend() {
+    const q = QUESTIONS[state.qi], send = $('send'), sum = $('choiceSum')
+    if (!send) return
+    const note = ($('note')?.value || '').trim()
+    const ok = q.kind === 'text' ? note.length > 0 : !!state.selected || note.length > 0
+    send.disabled = !ok
+    if (!sum) return
+    if (q.kind === 'text') { sum.innerHTML = note ? '' : '寫完按 Enter 送出；Shift+Enter 換行'; return }
+    const o = q.options.find((x) => x.id === state.selected)
+    sum.innerHTML = o ? `你的決定：<b>${o.label}</b>${note ? '＋補充說明' : ''}` : note ? '你的決定：<b>自己寫的回答</b>' : '選一個選項（按 1–3），或在上方補充自己的做法'
+  }
+  function bindPanel() {
+    $('later').onclick = () => closePanel('later')
+    $('prevQ').onclick = () => gotoQ(state.qi - 1)
+    $('nextQ').onclick = () => gotoQ(state.qi + 1)
+    $('toggleRaw').onclick = (e) => { const on = $('raw').dataset.open !== 'true'; $('raw').dataset.open = String(on); $('rawMeta').dataset.open = String(on); e.target.textContent = on ? '收起原文' : '看 AI 送來的原文' }
+    $('openConv').onclick = () => showToast('正式版：用 deep link 打開 Claude App／Codex App 的原對話')
+    panel.querySelectorAll('[data-opt]').forEach((b) => b.onclick = () => selectOpt(b.dataset.opt))
+    const note = $('note')
+    if (note) {
+      note.oninput = () => { state.note = note.value; updateSend() }
+      note.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() } }
+    }
+    if ($('send')) $('send').onclick = submit
+    if ($('reject')) $('reject').onclick = () => showToast('正式版：退回 AI 重擬，並記錄出題品質')
+    if ($('afterSend')) $('afterSend').onclick = afterReceipt
+    panel.querySelectorAll('[data-table]').forEach((b) => b.onclick = () => { const tv = $('tv-' + b.dataset.table); const on = tv.dataset.open !== 'true'; tv.dataset.open = String(on); b.textContent = on ? '收起表格' : '看表格' })
+    bindCharts()
+    updateSend()
+  }
+  function selectOpt(id) {
+    state.selected = state.selected === id ? null : id
+    panel.querySelectorAll('[data-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.opt === state.selected)))
+    updateSend()
+  }
+  function gotoQ(i) {
+    if (i < 0 || i >= QUESTIONS.length || i === state.qi) return
+    const body = $('pbody')
+    body.dataset.fading = 'true'
+    setTimeout(() => {
+      state.qi = i; state.selected = null; state.note = ''
+      renderPanel()
+      panel.querySelectorAll('.reveal').forEach((el) => el.style.transitionDelay = '0ms')
+      drawCharts(true)
+    }, state.reduced ? 0 : 140)
+  }
+  function submit() {
+    const q = QUESTIONS[state.qi], send = $('send')
+    if (!send || send.disabled) return
+    const o = q.options?.find((x) => x.id === state.selected)
+    state.answers[q.id] = { label: o ? o.label : '', note: state.note.trim(), at: '09:41' }
+    state.done.add(q.id)
+    const dec = $('decision')
+    dec.style.opacity = '0'
+    setTimeout(() => {
+      dec.innerHTML = receiptHtml(q, false)
+      dec.style.opacity = '1'
+      panel.querySelectorAll('.dots i').forEach((d, i) => d.dataset.done = String(state.done.has(QUESTIONS[i].id)))
+      const rows = dec.querySelectorAll('.rc-row')
+      rows.forEach((r, i) => setTimeout(() => r.dataset.on = 'true', state.reduced ? 0 : 160 + i * 260))
+      $('afterSend').onclick = afterReceipt
+      $('afterSend').focus()
+    }, state.reduced ? 0 : 140)
+  }
+  function afterReceipt() {
+    const n = nextUndone()
+    if (n === -1) { closePanel('done'); return }
+    gotoQ(n)
+  }
+
+  // ═══════════════ 圖表互動 ═══════════════
+  function bindCharts() {
+    panel.querySelectorAll('svg[data-line]').forEach((svg) => {
+      const meta = JSON.parse(svg.getAttribute('data-line'))
+      const tip = svg.parentElement.querySelector('.tip'), xh = svg.querySelector('.xhair'), dots = svg.querySelectorAll('.xdot'), box = svg.querySelector('.hitbox')
+      const Y = (v) => meta.t + meta.ph - (v - meta.min) / (meta.max - meta.min) * meta.ph
+      box.addEventListener('pointermove', (evt) => {
+        const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY
+        const p = pt.matrixTransform(svg.getScreenCTM().inverse())
+        const i = clamp(Math.round((p.x - meta.l) / meta.pw * (meta.n - 1)), 0, meta.n - 1)
+        const x = meta.l + i / (meta.n - 1) * meta.pw
+        xh.setAttribute('x1', x); xh.setAttribute('x2', x); xh.setAttribute('opacity', '1')
+        dots.forEach((d, k) => { d.setAttribute('cx', x); d.setAttribute('cy', Y(meta.series[k].values[i])); d.setAttribute('opacity', '1') })
+        const k = svg.viewBox.baseVal.width / svg.clientWidth
+        tip.innerHTML = `<div class="t-date">${meta.x[i]}</div>` + meta.series.map((s) => `<div>${meta.series.length > 1 ? s.name + '　' : ''}<b>${fmtVal(s.values[i], meta.unit, meta.dec)}</b></div>`).join('')
+        tip.style.left = Math.min(x / k + 12, svg.clientWidth - 150) + 'px'
+        tip.style.top = (Y(meta.series[0].values[i]) / k - 24) + 'px'
+        tip.dataset.show = 'true'
+      })
+      box.addEventListener('pointerleave', () => { xh.setAttribute('opacity', '0'); dots.forEach((d) => d.setAttribute('opacity', '0')); tip.dataset.show = 'false' })
+    })
+    panel.querySelectorAll('svg[data-bars] .grow').forEach((bar) => {
+      const svg = bar.ownerSVGElement, tip = svg.parentElement.querySelector('.tip')
+      bar.addEventListener('pointerenter', () => { tip.innerHTML = `<div class="t-date">${bar.dataset.name}</div><div><b>${bar.dataset.v}</b></div>`; tip.style.left = '0px'; tip.style.top = '-46px'; tip.dataset.show = 'true' })
+      bar.addEventListener('pointerleave', () => tip.dataset.show = 'false')
+    })
+  }
+  function drawCharts(instant) {
+    const dur = state.reduced || instant ? 0 : 640 * (state.slow ? 4 : 1)
+    panel.querySelectorAll('.draw').forEach((p) => {
+      p.style.transition = 'none'; p.style.strokeDasharray = '1'; p.style.strokeDashoffset = dur ? '1' : '0'
+      if (dur) requestAnimationFrame(() => requestAnimationFrame(() => { p.style.transition = `stroke-dashoffset ${dur}ms cubic-bezier(.16,1,.3,1)`; p.style.strokeDashoffset = '0' }))
+    })
+    panel.querySelectorAll('.grow').forEach((b, i) => {
+      b.style.transformBox = 'fill-box'; b.style.transformOrigin = 'left center'
+      b.style.transition = 'none'; b.style.transform = dur ? 'scaleX(0)' : 'none'
+      if (dur) requestAnimationFrame(() => requestAnimationFrame(() => { b.style.transition = `transform ${dur * 0.7}ms ${i * 40}ms cubic-bezier(.16,1,.3,1)`; b.style.transform = 'none' }))
+    })
+  }
+
+  // ═══════════════ 瀏海靜止狀態 ═══════════════
+  function notchText() { const n = activeQuestions().length; return n <= 1 ? '你有一則待處理通知' : `你有 ${n} 則待處理通知` }
+  function notchGeom() {
+    const L = restLength(notchText())
+    if (state.anchor === 'left') return { u0: 45, u1: 45 + L, L }
+    const arm = (L - T) / 2 + T
+    return { x1: arm, y1: arm, L }
+  }
+  function headAgent() { const qs = activeQuestions(); return qs.length ? qs[0].agent : 'claude' }
+  function notchIconPos(g) { return state.anchor === 'left' ? { x: T / 2, y: g.u0 + T / 2 } : { x: g.x1 - T / 2, y: T / 2 } }
+
+  function renderShape() {
+    const g = notchGeom()
+    const sh = shapeAt(state.anchor, state.pA, state.pB, g)
+    // 收回消失：所有題目處理完後，長度縮成 0
+    let paths = sh.paths
+    if (state.gone) paths = []
+    fill.innerHTML = paths.map((d) => `<path d="${d}" fill="#000"/>`).join('')
+    hit.innerHTML = ''
+    const resting = !state.open && !state.animating && !state.gone && state.pA === 0 && state.pB === 0
+    if (resting) {
+      hit.innerHTML = paths.map((d) => `<path d="${d}" fill="transparent"/>`).join('')
+      const tp = notchTextPath(state.anchor, g)
+      const ic = notchIconPos(g)
+      const icon = document.createElementNS(NS, 'g')
+      icon.setAttribute('transform', `translate(${ic.x - ICON / 2} ${ic.y - ICON / 2})`)
+      icon.innerHTML = markSvg(headAgent(), ICON).replace('<svg ', '<svg x="0" y="0" ')
+      hit.appendChild(icon)
+      const toks = tokenize(notchText())
+      let d = ICON / 2 + 7
+      const endD = tp.total + T / 2 - 12
+      for (const tk of toks) {
+        const mid = d + tk.adv / 2; d += tk.adv
+        if (tk.kind === 'space' || mid > endD + 2) continue
+        const q = tp.at(mid)
+        let rot = 0
+        if (tk.kind === 'cjk') { if (q.arc) rot = q.arc.turn * 14 * Math.sin(Math.PI * q.arc.t) }
+        else rot = q.arc ? 90 * q.arc.t : q.vertical ? 90 : 0
+        const el = document.createElementNS(NS, 'text')
+        el.textContent = tk.s
+        el.setAttribute('x', q.x.toFixed(2)); el.setAttribute('y', q.y.toFixed(2))
+        el.setAttribute('text-anchor', 'middle'); el.setAttribute('dominant-baseline', 'central')
+        el.setAttribute('font-size', FONT); el.setAttribute('font-family', '"Geist Sans","PingFang TC",sans-serif')
+        el.setAttribute('fill', '#b4bac4')
+        el.setAttribute('transform', `rotate(${rot.toFixed(2)} ${q.x.toFixed(2)} ${q.y.toFixed(2)})`)
+        hit.appendChild(el)
+      }
+    }
+    // 面板內容區對齊形狀
+    const c = shapeAt(state.anchor, 1, 1, g).content
+    panel.style.left = c.x + 'px'; panel.style.top = c.y + 'px'; panel.style.width = c.w + 'px'; panel.style.height = c.h + 'px'
+  }
+
+  // ═══════════════ 開／關動畫 ═══════════════
+  // 臨界阻尼響應 1-(1+ωt)e^{-ωt}：不回彈、收尾柔和
+  const crit = (t, w) => t <= 0 ? 0 : 1 - (1 + w * t) * Math.exp(-w * t)
+  let anim = null
+  function openPanel() {
+    if (state.open || state.animating || state.gone) return
+    if (!activeQuestions().length) return
+    state.qi = QUESTIONS.findIndex((q) => !state.done.has(q.id))
+    state.selected = null; state.note = ''
+    renderPanel()
+    panel.dataset.visible = 'true'; panel.dataset.open = 'false'; panel.dataset.reduced = String(state.reduced)
+    desktop.dataset.dim = 'true'
+    if (state.reduced) {
+      state.pA = 1; state.pB = 1; state.open = true; renderShape()
+      panel.dataset.open = 'true'; drawCharts(true); focusFirst(); return
+    }
+    const g = notchGeom(), from = notchIconPos(g)
+    startFly(from, true)
+    state.animating = true
+    anim = { dir: 1, t0: performance.now() }
+  }
+  function closePanel(reason) {
+    if (!state.open || state.animating) return
+    panel.dataset.open = 'false'
+    desktop.dataset.dim = 'false'
+    const last = !activeQuestions().length
+    if (state.reduced) {
+      state.pA = 0; state.pB = 0; state.open = false; panel.dataset.visible = 'false'
+      if (last) state.gone = true
+      renderShape(); afterClose(reason, last); return
+    }
+    state.animating = true
+    anim = { dir: -1, t0: performance.now() + 120, reason, last }
+    const g = notchGeom()
+    setTimeout(() => startFly(notchIconPos(g), false), 120)
+  }
+  function afterClose(reason, last) {
+    if (reason === 'later') showToast('已延後：15 分鐘後再問你')
+    if (last) showToast('全部處理完了，瀏海收回邊框')
+  }
+  function stepAnim(now) {
+    if (!anim) return
+    const k = state.slow ? 4 : 1
+    const t = Math.max(0, now - anim.t0) / 1000 / k
+    if (anim.dir === 1) {
+      state.pA = crit(t, 20)
+      state.pB = crit(t - 0.09, 11)
+      if (t > 0.2 && panel.dataset.open !== 'true') { panel.dataset.open = 'true'; drawCharts(false) }
+      if (state.pA > 0.999 && state.pB > 0.999) { state.pA = 1; state.pB = 1; state.animating = false; state.open = true; anim = null; finishFly(); focusFirst() }
+    } else {
+      const b = 1 - crit(t, 14), a = 1 - crit(t - 0.12, 18)
+      state.pB = b; state.pA = a
+      if (anim.last) state.lenShrink = crit(t - 0.3, 14)
+      if (b < 0.001 && a < 0.001) {
+        state.pA = 0; state.pB = 0; state.animating = false; state.open = false
+        panel.dataset.visible = 'false'
+        const { reason, last } = anim; anim = null
+        if (last) state.gone = true
+        afterClose(reason, last)
+      }
+    }
+  }
+  function focusFirst() { const o = panel.querySelector('.opt') || $('note'); o?.focus({ preventScroll: true }) }
+
+  // 圖示共享元素飛行
+  let flyState = null
+  function startFly(from, opening) {
+    const slot = panel.querySelector('#markSlot')
+    const to = slotCenter(slot)
+    fly.innerHTML = markSvg(headAgent(), 24).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')
+    fly.setAttribute('viewBox', headAgent() === 'claude' ? '0 0 248 248' : '0 0 24 24')
+    flyState = { from: opening ? from : to, to: opening ? to : from, s0: opening ? ICON : 26, s1: opening ? 26 : ICON, t0: performance.now(), dur: 520 }
+    fly.style.display = 'block'
+    if (slot) slot.style.visibility = 'hidden'
+  }
+  function stepFly(now) {
+    if (!flyState) return
+    const k = state.slow ? 4 : 1
+    const t = clamp((now - flyState.t0) / (flyState.dur * k), 0, 1)
+    const e = 1 - Math.pow(1 - t, 3)
+    const x = lerp(flyState.from.x, flyState.to.x, e), y = lerp(flyState.from.y, flyState.to.y, e), s = lerp(flyState.s0, flyState.s1, e)
+    fly.style.width = s + 'px'; fly.style.height = s + 'px'
+    fly.style.transform = `translate(${x - s / 2}px, ${y - s / 2}px)`
+    if (t >= 1) finishFly()
+  }
+  function finishFly() {
+    if (!flyState) return
+    flyState = null; fly.style.display = 'none'
+    const slot = panel.querySelector('#markSlot'); if (slot) slot.style.visibility = 'visible'
+  }
+  function slotCenter(slot) {
+    if (!slot) return { x: 70, y: 48 }
+    const r = slot.getBoundingClientRect(), d = display.getBoundingClientRect(), sc = d.width / W
+    return { x: (r.left - d.left) / sc + 13, y: (r.top - d.top) / sc + 13 }
+  }
+
+  function showToast(msg) { toast.textContent = msg; toast.dataset.show = 'true'; clearTimeout(showToast.t); showToast.t = setTimeout(() => toast.dataset.show = 'false', 2200) }
+
+  // ═══════════════ 主迴圈 ═══════════════
+  function frame(now) { stepAnim(now); stepFly(now); renderShape(); requestAnimationFrame(frame) }
+  window.__advance = (ms) => { const base = performance.now(); for (let t = 0; t <= ms; t += 16) { stepAnim(base + t); stepFly(base + t) } renderShape() }
+  window.__state = state
+
+  // ═══════════════ 控制與鍵盤 ═══════════════
+  hit.addEventListener('click', openPanel)
+  $('btnOpen').onclick = openPanel
+  $('btnReset').onclick = () => { state.done.clear(); state.answers = {}; state.gone = false; state.qi = 0; if (state.open) { state.open = false; panel.dataset.visible = 'false'; desktop.dataset.dim = 'false'; state.pA = 0; state.pB = 0 } renderShape() }
+  document.querySelectorAll('[data-anchor]').forEach((b) => b.onclick = () => {
+    if (state.open || state.animating) return
+    state.anchor = b.dataset.anchor
+    document.querySelectorAll('[data-anchor]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    renderShape()
+  })
+  document.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = () => { const k = b.dataset.toggle; state[k] = !state[k]; b.setAttribute('aria-pressed', String(state[k])); panel.dataset.reduced = String(state.reduced) })
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { state.reduced = true; document.querySelector('[data-toggle="reduced"]').setAttribute('aria-pressed', 'true') }
+  document.addEventListener('keydown', (e) => {
+    if (!state.open) return
+    const inNote = document.activeElement && document.activeElement.id === 'note'
+    if (e.key === 'Escape') { e.preventDefault(); closePanel('later'); return }
+    if (!inNote && /^[1-4]$/.test(e.key)) { const q = QUESTIONS[state.qi]; const o = q.options?.[+e.key - 1]; if (o && !state.done.has(q.id)) { selectOpt(o.id); panel.querySelector(`[data-opt="${o.id}"]`)?.focus() } return }
+    if (!inNote && e.key === 'Enter') { e.preventDefault(); if ($('afterSend')) afterReceipt(); else submit() }
+  })
+
+  // 依頁寬縮放
+  const device = $('device'), wrap = $('deviceWrap')
+  let SCALE = 1
+  const scaleNow = () => SCALE
+  function fit() {
+    const avail = Math.min(window.innerWidth - 32, 1520)
+    const dw = W + 28, dh = H + 32
+    SCALE = Math.min(1, avail / dw)
+    device.style.transform = `scale(${SCALE})`
+    wrap.style.width = (dw * SCALE) + 'px'; wrap.style.height = (dh * SCALE) + 'px'
+  }
+  window.addEventListener('resize', fit); fit()
+
+  // ═══════════════ Logo 粒子對照 ═══════════════
+  function particles(canvas, drawFn) {
+    const off = document.createElement('canvas'); off.width = 260; off.height = 260
+    const o = off.getContext('2d'); drawFn(o)
+    const data = o.getImageData(0, 0, 260, 260).data
+    const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, 260, 260)
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    for (let y = 0; y < 260; y += 4) for (let x = 0; x < 260; x += 4) {
+      if (data[(y * 260 + x) * 4 + 3] > 52) {
+        ctx.fillStyle = `rgba(232,234,238,${0.45 + rnd() * 0.5})`
+        ctx.beginPath(); ctx.arc(x + (rnd() - .5) * 2, y + (rnd() - .5) * 2, 0.9 + rnd() * 0.9, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+  }
+  particles($('logoOld'), (o) => { o.fillStyle = '#fff'; o.font = '600 205px "Geist Sans","PingFang TC",sans-serif'; o.textAlign = 'center'; o.textBaseline = 'middle'; o.fillText('✳', 130, 140) })
+  particles($('logoNew'), (o) => { o.save(); o.translate(20, 20); o.scale(220 / 248, 220 / 248); o.fillStyle = '#fff'; o.fill(new Path2D(CLAUDE_PATH)); o.restore() })
+
+  renderShape()
+  requestAnimationFrame(frame)
+})()
+</script>
+</body>
+</html>

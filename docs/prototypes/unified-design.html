@@ -1,0 +1,673 @@
+<title>軍師統一設計語言</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one Station-derived token set drives three surfaces — the Mac main window, the decision overlay, the phone app.
+   Glass is only for things that float above content. One accent; semantic colour only in small pills. */
+:root {
+  --window: #f5f5f5; --panel: #ffffff; --subtle: #fafafa; --hover: #f0f0f0;
+  --strong: #171717; --body: #404040; --muted: #6b6b6b; --faint: #a3a3a3;
+  --border: #e5e5e5; --border2: #d4d4d4;
+  --primary: #171717; --on-primary: #ffffff;
+  --accent: #2563eb; --accent-fill: #eff4ff;
+  --ok-fill: #ecfdf3; --ok: #067647; --warn-fill: #fffaeb; --warn: #b54708; --bad-fill: #fef3f2; --bad: #b42318;
+  --glass: rgb(255 255 255 / .62); --glass-strong: rgb(255 255 255 / .78); --glass-edge: rgb(255 255 255 / .85); --glass-line: rgb(0 0 0 / .07);
+  --shadow: 0 12px 40px rgb(0 0 0 / .12), 0 1px 2px rgb(0 0 0 / .05);
+  --wall-a: #c9d6e8; --wall-b: #e9dccf; --wall-c: #d4e3dc;
+  --scrim: rgb(0 0 0 / .18);
+  --sans: "Geist", "PingFang TC", "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: "Geist Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --window: #0a0a0a; --panel: #111111; --subtle: #161616; --hover: #1c1c1c;
+  --strong: #fafafa; --body: #d4d4d4; --muted: #a3a3a3; --faint: #737373;
+  --border: #262626; --border2: #333333;
+  --primary: #fafafa; --on-primary: #0a0a0a;
+  --accent: #60a5fa; --accent-fill: rgb(96 165 250 / .12);
+  --ok-fill: rgb(34 197 94 / .12); --ok: #6ee7a0; --warn-fill: rgb(245 158 11 / .12); --warn: #fcd34d; --bad-fill: rgb(239 68 68 / .12); --bad: #fca5a5;
+  --glass: rgb(30 30 32 / .55); --glass-strong: rgb(38 38 40 / .72); --glass-edge: rgb(255 255 255 / .14); --glass-line: rgb(255 255 255 / .06);
+  --shadow: 0 12px 40px rgb(0 0 0 / .5), 0 1px 2px rgb(0 0 0 / .4);
+  --wall-a: #1d2a3d; --wall-b: #2c2219; --wall-c: #18291f;
+  --scrim: rgb(0 0 0 / .35);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --window: #0a0a0a; --panel: #111111; --subtle: #161616; --hover: #1c1c1c;
+  --strong: #fafafa; --body: #d4d4d4; --muted: #a3a3a3; --faint: #737373;
+  --border: #262626; --border2: #333333;
+  --primary: #fafafa; --on-primary: #0a0a0a;
+  --accent: #60a5fa; --accent-fill: rgb(96 165 250 / .12);
+  --ok-fill: rgb(34 197 94 / .12); --ok: #6ee7a0; --warn-fill: rgb(245 158 11 / .12); --warn: #fcd34d; --bad-fill: rgb(239 68 68 / .12); --bad: #fca5a5;
+  --glass: rgb(30 30 32 / .55); --glass-strong: rgb(38 38 40 / .72); --glass-edge: rgb(255 255 255 / .14); --glass-line: rgb(255 255 255 / .06);
+  --shadow: 0 12px 40px rgb(0 0 0 / .5), 0 1px 2px rgb(0 0 0 / .4);
+  --wall-a: #1d2a3d; --wall-b: #2c2219; --wall-c: #18291f;
+  --scrim: rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--window); color: var(--body); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, textarea { font: inherit; color: var(--strong); }
+
+/* page chrome */
+.top { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 12px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.top h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--strong); }
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--hover); border-radius: 10px; }
+.seg button { padding: 5px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.sp { flex: 1; }
+.stage { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 0 40px; display: grid; grid-template-columns: minmax(0, 1fr) 392px; gap: 28px; align-items: start; }
+.stage.solo { grid-template-columns: minmax(0, 1fr); }
+.col { min-width: 0; display: grid; gap: 14px; }
+.cap { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+.notes { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 0 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.note { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.note h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--strong); }
+.note p, .note li { margin: 0; font-size: 13px; color: var(--body); line-height: 1.6; }
+.note ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+@media (max-width: 980px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* shared atoms */
+.mark { flex: none; display: inline-block; vertical-align: middle; }
+.pillst { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.pillst.warn { background: var(--warn-fill); color: var(--warn); }
+.pillst.ok { background: var(--ok-fill); color: var(--ok); }
+.pillst.neutral { background: var(--hover); color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--panel); color: var(--strong); }
+.btn:hover { background: var(--subtle); }
+.btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.btn.big { height: 44px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 600; }
+.btn[disabled] { opacity: .45; cursor: default; }
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); border: 1px solid var(--glass-edge); box-shadow: var(--shadow), inset 0 1px 0 var(--glass-edge); }
+
+/* ---------------- Mac frame ---------------- */
+.mac { position: relative; height: 620px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border2); box-shadow: var(--shadow); background: linear-gradient(135deg, var(--wall-a), var(--wall-b) 55%, var(--wall-c)); }
+.win { position: absolute; inset: 22px 22px 22px 22px; border-radius: 12px; background: var(--window); border: 1px solid var(--border); display: grid; grid-template-columns: 196px minmax(0, 1fr); overflow: hidden; box-shadow: 0 20px 50px rgb(0 0 0 / .18); }
+.side { padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lights { display: flex; gap: 7px; padding: 2px 4px 14px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: var(--border2); }
+.brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 12px; font-weight: 600; color: var(--strong); font-size: 15px; }
+.grp { font-size: 11px; color: var(--muted); padding: 10px 8px 4px; }
+.nav { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 8px; font-size: 13px; color: var(--body); }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--accent-fill); color: var(--accent); font-weight: 500; }
+.nav .ct { margin-left: auto; min-width: 20px; height: 18px; border-radius: 9px; font: 500 11px/18px var(--mono); text-align: center; background: var(--accent); color: #fff; }
+.presence { margin-top: auto; font-size: 12px; color: var(--muted); padding: 8px; display: flex; align-items: center; gap: 6px; }
+.presence::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--strong); }
+.main { margin: 8px 8px 8px 0; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.mh { height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--border); }
+.mh h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--strong); }
+.mb { padding: 16px 20px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+.intro { font-size: 13px; color: var(--muted); }
+.table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tr { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto 14px; gap: 12px; align-items: center; min-height: 56px; padding: 8px 14px; border-top: 1px solid var(--border); text-align: left; width: 100%; }
+.tr:first-child { border-top: 0; }
+.tr:hover { background: var(--subtle); }
+.tr .q { color: var(--strong); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr .sub { font-size: 12px; color: var(--muted); }
+.tr .tm { font: 12px var(--mono); color: var(--muted); }
+.empty { padding: 48px 16px; text-align: center; color: var(--muted); display: grid; gap: 6px; justify-items: center; }
+.empty b { color: var(--strong); font-size: 14px; }
+
+.mac { container-type: inline-size; }
+.main { container-type: inline-size; }
+@container (max-width: 520px) { .tr { grid-template-columns: 28px minmax(0, 1fr) 14px; } .tr .pillst, .tr .tm { display: none; } .tr .q { white-space: normal; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
+@container (max-width: 640px) { .win { grid-template-columns: minmax(0, 1fr); inset: 14px; } .side { display: none; } .main { margin: 8px; } .mh .btn { padding: 0 10px; } }
+/* edge notch: the one surface that stays pure black (it imitates the bezel) */
+.notch { position: absolute; left: 0; top: 46px; height: 132px; width: 26px; background: #000; border-radius: 0 12px 12px 0; display: flex; flex-direction: column; align-items: center; padding-top: 8px; gap: 8px; color: #b4bac4; font-size: 11px; writing-mode: vertical-rl; letter-spacing: .05em; z-index: 3; }
+.notch .mark { writing-mode: horizontal-tb; }
+
+/* decision overlay on the Mac */
+.ov { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: var(--scrim); animation: fade .18s ease-out; }
+.dpanel { width: min(720px, calc(100% - 48px)); max-height: calc(100% - 40px); border-radius: 22px; display: flex; flex-direction: column; overflow: hidden; animation: rise .22s ease-out; }
+.dh { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--glass-line); }
+.dh .who { font-weight: 600; color: var(--strong); }
+.dh .meta { font-size: 12px; color: var(--muted); }
+.db { padding: 18px 22px; overflow: auto; display: grid; gap: 14px; }
+.dq { font-size: 24px; font-weight: 600; line-height: 1.35; color: var(--strong); text-wrap: balance; }
+.dw { color: var(--body); font-size: 14px; }
+.opts { display: grid; gap: 8px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--glass-strong); border: 1px solid var(--glass-line); width: 100%; }
+.opt:hover { border-color: var(--border2); }
+.opt .k { flex: none; width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--border2); font: 500 12px/22px var(--mono); text-align: center; color: var(--muted); }
+.opt .l { color: var(--strong); font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.opt .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.opt[aria-checked="true"] { border: 1.5px solid var(--strong); }
+.opt[aria-checked="true"] .k { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.rec { font-size: 11px; font-weight: 500; color: var(--accent); background: var(--accent-fill); padding: 1px 7px; border-radius: 999px; }
+.sign { border: 1px solid var(--border2); border-radius: 12px; padding: 10px 14px; display: grid; gap: 4px; background: var(--glass-strong); }
+.sign .t { font-size: 12px; font-weight: 600; color: var(--strong); }
+.sign div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.sign span:first-child { color: var(--muted); }
+.sign span:last-child { color: var(--strong); text-align: right; font-variant-numeric: tabular-nums; }
+.df { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--glass-line); }
+.df .ghost { font-size: 13px; color: var(--muted); }
+.cmd { font: 13px var(--mono); color: var(--strong); background: var(--hover); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+
+/* ---------------- Phone ---------------- */
+.phone { position: relative; width: 392px; height: min(840px, calc(100vh - 110px)); min-height: 640px; border-radius: 46px; overflow: hidden; background: var(--window); border: 1px solid var(--border2); box-shadow: var(--shadow), inset 0 0 0 6px var(--panel); }
+@media (max-width: 980px) { .phone { width: 100%; max-width: 430px; margin: 0 auto; } }
+@media (max-width: 520px) { .phone { width: 100%; height: calc(100dvh - 100px); border-radius: 0; border: 0; box-shadow: none; } .stage { padding-inline: 0; } }
+.scr { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.sbar { position: absolute; top: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0; font-weight: 600; font-size: 15px; color: var(--strong); z-index: 6; }
+.sbar i { width: 24px; height: 11px; border: 1.5px solid var(--strong); border-radius: 3px; position: relative; }
+.sbar i::after { content: ""; position: absolute; inset: 1.5px 6px 1.5px 1.5px; background: var(--strong); border-radius: 1px; }
+.ph { position: absolute; top: 46px; left: 12px; right: 12px; z-index: 6; height: 48px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 10px; }
+.ph b { color: var(--strong); font-size: 15px; font-weight: 600; }
+.ph .st { margin-left: auto; font-size: 12px; color: var(--muted); padding-right: 8px; display: flex; gap: 6px; align-items: center; }
+.ph .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--strong); }
+#chat { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+#chat::-webkit-scrollbar { display: none; }
+#chat > .pad { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 112px 16px var(--dock, 260px); will-change: transform; }
+.hero { padding: 6px 4px 6px; }
+.hero h3 { margin: 0; font-size: 30px; line-height: 1.2; font-weight: 600; color: var(--strong); letter-spacing: -.01em; }
+.hero p { margin: 6px 0 0; font-size: 15px; color: var(--muted); }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.av { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--border); }
+.card { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 16px 16px 14px; display: grid; gap: 8px; }
+.card.live { box-shadow: 0 1px 2px rgb(0 0 0 / .05), 0 8px 24px rgb(0 0 0 / .06); }
+.card.old { opacity: .62; }
+.cq { font-size: 18px; font-weight: 600; line-height: 1.45; color: var(--strong); white-space: pre-wrap; text-wrap: pretty; }
+.card.old .cq, .cq.soft { font-size: 16px; font-weight: 500; }
+.cw { font-size: 14px; color: var(--body); }
+.follow { border-top: 1px solid var(--border); padding-top: 8px; display: grid; gap: 4px; font-size: 14px; }
+.follow .who { font-size: 12px; color: var(--muted); }
+.quote { border-left: 2px solid var(--border2); padding-left: 10px; display: grid; gap: 3px; color: var(--body); }
+.fold { justify-self: start; font-size: 13px; color: var(--muted); min-height: 30px; }
+.mine { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 84%; }
+.me { background: var(--primary); color: var(--on-primary); padding: 10px 15px; border-radius: 20px 20px 6px 20px; white-space: pre-wrap; font-size: 15px; }
+.tick { font-size: 12px; color: var(--muted); text-align: right; }
+.tick.wait { color: var(--warn); } .tick.run { color: var(--accent); }
+.daysep { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.daysep::before, .daysep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.pend { display: flex; flex-direction: column; align-items: flex-start; }
+.phead { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 14px; color: var(--body); }
+.stack { display: flex; }
+.stk { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 2px solid var(--window); margin-left: -9px; }
+.stk:first-child { margin-left: 0; }
+.plist { margin-top: 6px; width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.plist button { display: flex; gap: 10px; align-items: center; width: 100%; padding: 11px 14px; text-align: left; font-size: 13px; color: var(--body); border-top: 1px solid var(--border); }
+.plist button:first-child { border-top: 0; }
+.plist span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .go { color: var(--accent); font-size: 12px; flex: none; }
+.sysline { align-self: center; font-size: 12px; color: var(--muted); }
+
+/* floating glass dock */
+.dock { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 7; border-radius: 30px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.quiet { display: flex; gap: 6px; align-items: center; }
+.qchip { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--body); background: var(--glass-strong); border: 1px solid var(--glass-line); }
+.answers-wrap { position: relative; }
+.answers { display: grid; gap: 8px; max-height: var(--amax, 300px); overflow-y: auto; scrollbar-width: none; padding: 1px; }
+.answers::-webkit-scrollbar { display: none; }
+.answers.two { grid-template-columns: 1fr 1fr; }
+.ans { position: relative; min-height: 56px; border-radius: 20px; padding: 12px 16px; text-align: left; color: var(--strong); background: var(--glass-strong); border: 1px solid var(--glass-edge); box-shadow: 0 1px 0 var(--glass-edge) inset, 0 4px 14px rgb(0 0 0 / .06); display: flex; flex-direction: column; justify-content: center; gap: 2px; transition: transform .08s; }
+.answers.two .ans { align-items: center; text-align: center; min-height: 64px; }
+.ans:active { transform: scale(.98); }
+.ans .al { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.ans .ad { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.ans.rec { border: 1.5px solid var(--strong); }
+.ans .tag { position: absolute; top: -8px; right: 14px; font-size: 11px; font-weight: 600; background: var(--primary); color: var(--on-primary); padding: 1px 8px; border-radius: 999px; }
+.answers.two .ans .tag { right: 50%; transform: translateX(50%); }
+.ans.more { font-size: 12px; }
+.fadehint { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; pointer-events: none; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; font-size: 12px; color: var(--muted); background: linear-gradient(to bottom, transparent, var(--glass-strong) 70%); border-radius: 0 0 20px 20px; }
+.inrow { display: flex; gap: 8px; align-items: center; }
+.inrow input { flex: 1; min-width: 0; height: 44px; border-radius: 22px; border: 1px solid var(--glass-line); background: var(--glass-strong); padding: 0 16px; }
+.inrow input::placeholder { color: var(--faint); }
+.circ { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 19px; }
+.circ.plus { background: var(--glass-strong); border: 1px solid var(--glass-line); color: var(--strong); }
+.circ.send { background: var(--primary); color: var(--on-primary); font-weight: 700; }
+.circ[disabled], .inrow input:disabled { opacity: .4; cursor: default; }
+
+/* toast + sheets (phone) */
+.toast { position: absolute; left: 12px; right: 12px; top: 100px; z-index: 9; border-radius: 20px; padding: 10px 10px 12px 16px; display: flex; align-items: center; gap: 10px; animation: rise .2s ease-out; }
+.toast .tx { flex: 1; min-width: 0; }
+.toast b { display: block; color: var(--strong); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast span { font-size: 12px; color: var(--muted); }
+.toast .bar { position: absolute; left: 16px; right: 16px; bottom: 5px; height: 2px; border-radius: 2px; background: var(--strong); opacity: .35; transform-origin: left; animation: drain 5s linear forwards; }
+@keyframes drain { to { transform: scaleX(0); } }
+.toast button { font-weight: 600; color: var(--strong); min-height: 40px; padding: 0 12px; border-radius: 999px; background: var(--glass-strong); }
+.sheetbg { position: absolute; inset: 0; z-index: 10; background: var(--scrim); display: flex; align-items: flex-end; animation: fade .15s; }
+.sheet { width: 100%; max-height: 90%; border-radius: 30px 30px 0 0; padding: 8px 18px 22px; display: flex; flex-direction: column; gap: 12px; overflow: auto; animation: rise .22s ease-out; }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--border2); margin: 2px auto 4px; }
+.sheet h4 { margin: 0; font-size: 22px; font-weight: 600; color: var(--strong); text-align: center; }
+.sheet .sub { text-align: center; color: var(--muted); font-size: 14px; margin-top: -6px; }
+.list { background: var(--glass-strong); border: 1px solid var(--glass-line); border-radius: 18px; overflow: hidden; }
+.list button { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 13px 16px; border-top: 1px solid var(--glass-line); text-align: left; color: var(--strong); }
+.list button:first-child { border-top: 0; }
+.list button[aria-checked="true"] { background: var(--accent-fill); color: var(--accent); font-weight: 600; }
+.ta { width: 100%; min-height: 90px; border-radius: 18px; border: 1px solid var(--glass-line); background: var(--glass-strong); padding: 12px 14px; resize: none; }
+
+/* pull to reveal history */
+.pullind { position: absolute; left: 0; right: 0; top: 104px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); opacity: 0; pointer-events: none; }
+.pullind .rb { stroke: var(--border2); } .pullind .rg { stroke: var(--strong); }
+.pullind.ready { color: var(--strong); }
+.pullind.loading svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.reveal { animation: reveal .45s ease-out both; }
+@keyframes reveal { from { opacity: 0; transform: translateY(-12px); } }
+
+@media (prefers-reduced-motion: reduce) { .ov, .dpanel, .toast, .sheet, .sheetbg, .reveal, .pullind.loading svg, .toast .bar { animation: none; } .ans { transition: none; } }
+</style>
+
+<div class="top">
+  <h1>軍師 · 統一設計語言</h1>
+  <div class="seg" id="view" role="group" aria-label="看哪個介面"><button data-v="all" aria-pressed="true">全部</button><button data-v="mac">電腦</button><button data-v="phone">手機</button></div>
+  <span class="sp"></span>
+  <div class="seg" id="theme" role="group" aria-label="外觀"><button data-th="system" aria-pressed="true">跟隨系統</button><button data-th="light" aria-pressed="false">淺色</button><button data-th="dark" aria-pressed="false">深色</button></div>
+  <button class="btn" id="reset">重設假資料</button>
+</div>
+<div class="stage" id="stage">
+  <div class="col" id="macCol">
+    <div class="cap">電腦 · 主視窗與決策介面（點一列打開決策介面）</div>
+    <div class="mac" id="mac"></div>
+  </div>
+  <div class="col" id="phoneCol">
+    <div class="cap" style="display:flex;align-items:center;gap:8px">手機 App <span class="sp"></span><button class="btn" id="reopen" style="height:28px">模擬重新打開</button></div>
+    <div class="phone" id="phone"></div>
+  </div>
+</div>
+<div class="notes">
+  <div class="note"><h3>一套語言，以主視窗為準</h3><p>三個介面共用主視窗的顏色、字體、圓角和按鈕：中性灰、白色面板、細框線、Geist 字體。主要按鈕淺色是黑底、深色是白底。</p></div>
+  <div class="note"><h3>顏色只剩一個</h3><p>強調色只有藍色，用在選取、焦點和連結。紅黃綠只出現在小狀態標籤裡。Claude 和 Codex 的圖示是畫面上唯一的品牌色。</p></div>
+  <div class="note"><h3>玻璃 = 浮在內容上面</h3><p>手機底部的回覆面板與按鈕、電腦跳出來的決策介面、撤回提示用液態玻璃；主視窗的內容面板維持實心白色。玻璃只代表一件事：現在要你處理的。</p></div>
+  <div class="note"><h3>唯一例外：邊緣瀏海</h3><p>它要假裝是螢幕邊框的一部分，所以維持純黑。決策介面從瀏海長出來之後，就換成統一的玻璃面板。</p></div>
+  <div class="note"><h3>長文案</h3><ul><li>短選項：兩個大按鈕並排。</li><li>選項長或有說明：一排一個，文字可換行。</li><li>超過面板高度：按鈕區自己捲動，底部淡出並提示「往下還有選項」，輸入框固定在最下面。</li></ul></div>
+  <div class="note"><h3>沒有 Face ID</h3><p>動錢的題目還是先跳出核對畫面（所見即所簽），按「批准並執行」就送出。其他送出都有 5 秒撤回。</p></div>
+</div>
+
+<script>
+/* ---------- marks ---------- */
+const CLAUDE_D = "M52.4285 162.873L98.7844 136.879L99.5485 134.602L98.7844 133.334H96.4921L88.7237 132.862L62.2346 132.153L39.3113 131.207L17.0249 130.026L11.4214 128.844L6.2 121.873L6.7094 118.447L11.4214 115.257L18.171 115.847L33.0711 116.911L55.485 118.447L71.6586 119.392L95.728 121.873H99.5485L100.058 120.337L98.7844 119.392L97.7656 118.447L74.5877 102.732L49.4995 86.1905L36.3823 76.62L29.3779 71.7757L25.8121 67.2858L24.2839 57.3608L30.6515 50.2716L39.3113 50.8623L41.4763 51.4531L50.2636 58.1879L68.9842 72.7209L93.4357 90.6804L97.0015 93.6343L98.4374 92.6652L98.6571 91.9801L97.0015 89.2625L83.757 65.2772L69.621 40.8192L63.2534 30.6579L61.5978 24.632C60.9565 22.1032 60.579 20.0111 60.579 17.4246L67.8381 7.49965L71.9133 6.19995L81.7193 7.49965L85.7946 11.0443L91.9074 24.9865L101.714 46.8451L116.996 76.62L121.453 85.4816L123.873 93.6343L124.764 96.1155H126.292V94.6976L127.566 77.9197L129.858 57.3608L132.15 30.8942L132.915 23.4505L136.608 14.4708L143.994 9.62643L149.725 12.344L154.437 19.0788L153.8 23.4505L150.998 41.6463L145.522 70.1215L141.957 89.2625H143.994L146.414 86.7813L156.093 74.0206L172.266 53.698L179.398 45.6635L187.803 36.802L193.152 32.5484H203.34L210.726 43.6549L207.415 55.1159L196.972 68.3492L188.312 79.5739L175.896 96.2095L168.191 109.585L168.882 110.689L170.738 110.53L198.755 104.504L213.91 101.787L231.994 98.7149L240.144 102.496L241.036 106.395L237.852 114.311L218.495 119.037L195.826 123.645L162.07 131.592L161.696 131.893L162.137 132.547L177.36 133.925L183.855 134.279H199.774L229.447 136.524L237.215 141.605L241.8 147.867L241.036 152.711L229.065 158.737L213.019 154.956L175.45 145.977L162.587 142.787H160.805V143.85L171.502 154.366L191.242 172.089L215.82 195.011L217.094 200.682L213.91 205.172L210.599 204.699L188.949 188.394L180.544 181.069L161.696 165.118H160.422V166.772L164.752 173.152L187.803 207.771L188.949 218.405L187.294 221.832L181.308 223.959L174.813 222.777L161.187 203.754L147.305 182.486L136.098 163.345L134.745 164.2L128.075 235.42L125.019 239.082L117.887 241.8L111.902 237.31L108.718 229.984L111.902 215.452L115.722 196.547L118.779 181.541L121.58 162.873L123.291 156.636L123.14 156.219L121.773 156.449L107.699 175.752L86.304 204.699L69.3663 222.777L65.291 224.431L58.2867 220.768L58.9235 214.27L62.8713 208.48L86.304 178.705L100.44 160.155L109.551 149.507L109.462 147.967L108.959 147.924L46.6977 188.512L35.6182 189.93L30.7788 185.44L31.4156 178.115L33.7079 175.752L52.4285 162.873Z";
+const LOBES = Array.from({ length: 8 }, (_, i) => { const a = i / 8 * Math.PI * 2 + Math.PI / 8; return `<circle cx="${(12 + Math.cos(a) * 6.2).toFixed(2)}" cy="${(12 + Math.sin(a) * 6.2).toFixed(2)}" r="4.6"/>`; }).join("");
+let gid = 0;
+function mark(a, s = 18) {
+  if (a === "claude") return `<svg class="mark" width="${s}" height="${s}" viewBox="0 0 248 248" role="img" aria-label="Claude"><path fill="#D97757" d="${CLAUDE_D}"/></svg>`;
+  if (a === "codex") { const id = "g" + gid++; return `<svg class="mark" width="${s}" height="${s}" viewBox="0 0 24 24" role="img" aria-label="Codex"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a8f6"/><stop offset=".5" stop-color="#6c78f5"/><stop offset="1" stop-color="#3430ef"/></linearGradient></defs><g fill="url(#${id})">${LOBES}<circle cx="12" cy="12" r="7.2"/></g><path d="M8.4 9.2 L10.9 12 L8.4 14.8 M12.6 14.8 H16" fill="none" stroke="#f2f3ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
+  return `<svg class="mark" width="${s}" height="${s}" viewBox="0 0 24 24" role="img" aria-label="軍師"><rect x="1" y="1" width="22" height="22" rx="6" fill="#2a2a2c"/><path d="M8.5 6.5v11M8.5 12l5.5-5.5M10.5 10l5 7.5" stroke="#f5f1e8" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>`;
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const AG = { claude: "Claude", codex: "Codex" };
+
+/* ---------- data（三個介面共用） ---------- */
+const BASE = {
+  sessions: {
+    kunsu: { id: "kunsu", agent: "codex", status: "reply", turns: [
+      { u: "外接螢幕上拖邊緣瀏海會跳一下，幫我修" }, { t: "讀了 4 個檔 · 搜尋 2 次" },
+      { a: "找到了：換螢幕時 grab offset 用的是舊螢幕的座標，第一幀就會跳。我改成在換 stage 時重新量。" },
+      { t: "改了 3 個檔 · 跑了測試 ✓" }, { a: "測試全綠了。要我直接 commit 並跑 build-install 嗎？\nA. commit 並安裝\nB. 先給我看 diff" }] },
+    threads: { id: "threads", name: "blog-site", agent: "claude", status: "perm", turns: [
+      { u: "tracker 修好就推上去" }, { t: "改了 2 個檔 · 跑了測試 ✓" }, { a: "修好了，測試通過。接下來要推到遠端。" }],
+      perm: { cmd: "git push origin feat/tracker", why: "把 tracker 修正推到遠端分支，之後才能開 PR。" } },
+    ads: { id: "ads", name: "ads-review", agent: "claude", status: "run", run: "看素材疲勞中", turns: [
+      { u: "每晚復盤：看 Meta 三個課程廣告組" }, { t: "抓了 3 份報表" }, { a: "「課程早鳥」CPA 從 NT$268 漲到 NT$412，我問你要不要降預算。" }] },
+  },
+  decisions: [
+    { id: "notch", agent: "codex", session: "kunsu", project: "kunsu", time: "23:31",
+      q: "邊緣瀏海拖到角落附近放開時，要吸附成 L 形，還是滑回直邊？", why: "決定後 Codex 會照這個改 BDD 和測試，大約 20 分鐘。",
+      opts: [{ l: "吸附成 L 形", d: "距離角落 30% 以內就吸附，跟現在桌面一致", rec: true }, { l: "滑回直邊", d: "永遠停在直邊，留 24 px 間距" }] },
+    { id: "hook", agent: "claude", session: null, project: "Threads 草稿", time: "23:22",
+      q: "明天早上那篇 Threads，開頭要用哪一句？", why: "三句都是根據你過去 30 天互動最好的貼文寫的，選好後明早 8:30 排程發出。",
+      opts: [{ l: "我寫了 8 年程式，最後發現最難的不是技術，而是每天都要決定什麼不做。", rec: true },
+        { l: "一人公司最貴的成本不是錢，是你每天浪費在不重要決定上的那兩個小時。" },
+        { l: "我把所有要我拍板的事丟給一個 App，它每 15 分鐘就來煩我一次，結果我真的變快了。" },
+        { l: "都不好，請 AI 重寫三句" }] },
+    { id: "budget", agent: "claude", session: "ads", project: "ads-review", time: "23:18",
+      q: "「課程早鳥」CPA 漲到 NT$412，要把日預算降到 NT$800 嗎？", why: "不處理的話今晚到明早大約再花 NT$1,100，預估多 2–3 筆轉換。",
+      money: [["廣告組", "課程早鳥｜再行銷 30 天"], ["目前日預算", "NT$1,500"], ["改為", "NT$800"]],
+      opts: [{ l: "降到 NT$800", d: "立刻生效，學習期不重置", rec: true }, { l: "先不動", d: "明早復盤再決定" }] },
+  ],
+};
+const HIST0 = {
+  "今晚": [{ agent: "codex", project: "demo-shop", time: "21:05", q: "你開了新對話", a: "landing page hero 改成新文案", res: "改好了，已部署到 Zeabur 預覽環境。" },
+           { agent: "claude", project: "notes", time: "22:31", q: "這週決策紀錄要放進 W41，還是新開一份？", a: "放進 W41", res: "整理好了，寫在 2026-W41.md。" }],
+  "昨天": [{ agent: "codex", project: "kunsu", time: "22:10", q: "手機中轉要用 Tailscale 還是 Zeabur？", a: "Zeabur", res: "已寫進 PRD §30。" }],
+};
+const DAYS = ["今晚", "昨天"];
+const REPLY = "好，這步處理完了。下一步要做什麼？\nA. 跑完整測試\nB. 先停在這裡";
+const nameOf = s => s.name || s.id;
+
+let S, timers = [];
+function fresh() {
+  timers.forEach(clearTimeout); timers = [];
+  S = structuredClone(BASE);
+  S.hist = structuredClone(HIST0); S.ex = []; S.skipped = []; S.toast = null; S.sheet = null; S.ov = null;
+  S.ui = { loaded: 0, pendOpen: false, asksOpen: {}, visit: "23:44" };
+  openVisit();
+}
+const later = (ms, fn) => timers.push(setTimeout(() => { fn(); renderAll(); }, ms));
+
+/* 需要你的事：決定 > 批准 > 回話 */
+function items() {
+  const o = [];
+  S.decisions.forEach(d => o.push({ kind: "decision", id: "d:" + d.id, d, agent: d.agent, project: d.project, q: d.q }));
+  Object.values(S.sessions).filter(s => s.status === "perm" && s.perm).forEach(s => o.push({ kind: "perm", id: "p:" + s.id, s, agent: s.agent, project: nameOf(s), q: "要執行 " + s.perm.cmd }));
+  Object.values(S.sessions).filter(s => s.status === "reply").forEach(s => o.push({ kind: "reply", id: "r:" + s.id, s, agent: s.agent, project: nameOf(s), q: lastAI(s) }));
+  return o.sort((a, b) => S.skipped.indexOf(a.id) - S.skipped.indexOf(b.id));
+}
+const lastAI = s => (s.turns.filter(t => t.a).slice(-1)[0] || {}).a || "";
+const running = () => Object.values(S.sessions).filter(s => s.status === "run");
+const byId = id => items().find(i => i.id === id);
+
+/* ---------- 回答（兩個介面共用同一條路徑） ---------- */
+function snap() { return JSON.stringify({ sessions: S.sessions, decisions: S.decisions, ex: S.ex, hist: S.hist, skipped: S.skipped }); }
+function restore(j) { Object.assign(S, JSON.parse(j)); }
+function queue(label, apply, revert, commit, exId) {
+  if (S.toast) { clearTimeout(S.toast.timer); const t = S.toast; S.toast = null; t.commit(); }
+  apply();
+  const t = { label, revert, commit, exId };
+  t.timer = setTimeout(() => { if (S.toast === t) { S.toast = null; commit(); renderAll(); } }, 5000);
+  S.toast = t; renderAll();
+}
+function undo() { const t = S.toast; if (!t) return; clearTimeout(t.timer); S.toast = null; t.revert(); renderAll(); }
+function record(it, label, res) {
+  const h = { agent: it.agent, project: it.project, time: "剛剛", q: it.q, a: label, res: res || "處理中…", sid: it.kind === "decision" ? it.d.session : it.s.id };
+  (S.hist.now = S.hist.now || []).push(h);
+  let e = S.ex.find(x => x.item === it.id && !x.answer);
+  if (!e) { S.ex = S.ex.filter(x => x.answer); e = { id: "x" + Math.random(), item: it.id, asks: [] }; S.ex.push(e); }
+  e.answer = label; e.snap = { agent: it.agent, project: it.project, q: it.kind === "reply" ? lastAI(it.s).split("\n")[0] : it.q }; e.h = S.hist.now.length - 1;
+  return e;
+}
+function resume(sid) {
+  const s = S.sessions[sid]; if (!s) return;
+  s.status = "run"; s.run = "處理中";
+  later(2400, () => {
+    s.turns.push({ t: "讀了 3 個檔 · 改了 1 個檔" }, { a: REPLY }); s.status = "reply";
+    const h = (S.hist.now || []).find(x => x.sid === sid && x.res === "處理中…"); if (h) h.res = "這步處理完了，又問你下一步。";
+    askNext();
+  });
+}
+function answerDecision(did, idx, confirmed) {
+  const i = S.decisions.findIndex(d => d.id === did); if (i < 0) return;
+  const d = S.decisions[i], o = d.opts[idx], it = byId("d:" + did);
+  if (d.money && o.rec && !confirmed) { S.sheet = { kind: "money", id: did, sel: idx }; renderAll(); return; }
+  if (d.money && o.rec) { // 核對後直接送出，不用 Face ID
+    S.decisions.splice(i, 1); record(it, o.l, "已簽章，交給 executor 執行。"); S.sheet = { kind: "receipt", label: o.l }; S.ov = null; askNext(); renderAll(); return;
+  }
+  const before = snap();
+  queue(`「${o.l}」`, () => { S.decisions.splice(i, 1); const e = record(it, o.l, d.session ? null : `已交給 ${AG[d.agent]}。`); S.lastEx = e.id; askNext(); },
+    () => restore(before), () => { if (d.session) resume(d.session); });
+  if (S.toast) { S.toast.exId = S.lastEx; renderAll(); }
+}
+function sendReply(sid, text) {
+  const s = S.sessions[sid], it = byId("r:" + sid); if (!s || !it) return;
+  const before = snap();
+  queue(`「${text}」`, () => { s.turns.push({ u: text }); s.status = "run"; s.run = "等你撤回時間結束"; const e = record(it, text); S.lastEx = e.id; askNext(); },
+    () => restore(before), () => resume(sid));
+  if (S.toast) { S.toast.exId = S.lastEx; renderAll(); }
+}
+function permit(sid, allow) {
+  const s = S.sessions[sid], it = byId("p:" + sid); if (!s || !it) return;
+  const cmd = s.perm.cmd; delete s.perm;
+  record(it, allow ? "允許一次" : "拒絕", allow ? "推上去了。" : "好，不推。");
+  if (allow) { s.status = "run"; s.run = "推送中"; later(1800, () => { s.turns.push({ t: `執行了 ${cmd} ✓` }, { a: "推上去了。要開 PR 嗎？\nA. 開 PR\nB. 先不用" }); s.status = "reply"; askNext(); }); }
+  else { s.turns.push({ a: "好，不推。要我先整理成草稿 PR 嗎？\nA. 好\nB. 不用" }); s.status = "reply"; }
+  S.ov = null; askNext(); renderAll();
+}
+
+/* ---------- 手機：一次一件 ---------- */
+function openVisit() {
+  if (S.hist.now && S.hist.now.length) { S.hist["今晚"] = S.hist["今晚"].concat(S.hist.now); S.hist.now = []; }
+  S.ex = []; S.skipped = []; S.ui.pendOpen = false; S.ui.loaded = 0; askNext();
+}
+function current() { const e = S.ex[S.ex.length - 1]; return e && !e.answer ? e : null; }
+function askNext() {
+  if (current()) { if (!byId(current().item)) S.ex.pop(); else return; }
+  const it = items()[0];
+  if (it) S.ex.push({ id: "x" + Math.random(), item: it.id, asks: [] });
+}
+const optsFromText = t => (t || "").split("\n").map(l => l.trim().match(/^([A-D])[.．、]\s*(.+)$/)).filter(Boolean).map(m => ({ key: m[1], l: m[2] }));
+function answersFor(it) {
+  if (it.kind === "decision") return it.d.opts.map((o, i) => ({ l: o.l, d: o.d || (it.d.money && o.rec ? "會先讓你核對金額" : ""), rec: o.rec, act: "dec", v: it.d.id, i }));
+  if (it.kind === "perm") return [{ l: "允許一次", act: "perm", v: it.s.id, i: 1 }, { l: "拒絕", act: "perm", v: it.s.id, i: 0 }];
+  const o = optsFromText(lastAI(it.s));
+  return o.length ? o.map(x => ({ l: x.l, act: "reply", v: it.s.id, t: x.key + "（" + x.l + "）" })) : [{ l: "繼續", act: "reply", v: it.s.id, t: "繼續" }];
+}
+const wid = s => [...s].reduce((n, c) => n + (/[\u0000-ÿ]/.test(c) ? .55 : 1), 0);
+function answersHTML(list) {
+  const two = list.length >= 2 && list.length <= 4 && list.every(a => !a.d && wid(a.l) <= 8);
+  return `<div class="answers-wrap"><div class="answers ${two ? "two" : ""}" id="answers" role="group" aria-label="回答">${list.map(a =>
+    `<button class="ans ${a.rec ? "rec" : ""}" data-a="${a.act}" data-v="${esc(a.v)}" data-i="${a.i ?? ""}" data-t="${esc(a.t || "")}">${a.rec ? '<span class="tag">AI 建議</span>' : ""}<span class="al">${esc(a.l)}</span>${a.d ? `<span class="ad">${esc(a.d)}</span>` : ""}</button>`).join("")}</div><div class="fadehint" id="fadehint" hidden>往下還有選項</div></div>`;
+}
+function questionHTML(e, live) {
+  const it = live ? byId(e.item) : null;
+  const sn = e.snap || {};
+  const agent = it ? it.agent : sn.agent;
+  let body;
+  if (it) {
+    if (it.kind === "decision") body = `<div class="cq">${esc(it.d.q)}</div><div class="cw">${esc(it.d.why)}</div>${it.d.money ? `<div class="sign"><span class="t">所見即所簽</span>${it.d.money.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>` : ""}`;
+    else if (it.kind === "perm") body = `<div class="cq">要執行這個指令嗎？</div><div class="cmd">${esc(it.s.perm.cmd)}</div><div class="cw">${esc(it.s.perm.why)}</div>`;
+    else body = `<div class="cq soft">${esc(lastAI(it.s).split("\n").filter(l => !/^[A-D][.．、]/.test(l.trim())).join("\n"))}</div>`;
+  } else body = `<div class="cq">${esc(sn.q)}</div>`;
+  const asks = e.asks || [];
+  let ah = "";
+  const one = a => `<div class="follow"><span class="who">你問：${esc(a.q)}</span>${a.quote ? `<div class="quote">${a.quote.map(l => `<div>${esc(l)}</div>`).join("")}</div>` : `<div>${esc(a.a)}</div>`}</div>`;
+  if (asks.length) ah = live ? asks.map(one).join("") : `<button class="fold" data-a="fold" data-v="${e.id}">追問 ${asks.length} 次 ${S.ui.asksOpen[e.id] ? "▴" : "▾"}</button>` + (S.ui.asksOpen[e.id] ? asks.map(one).join("") : "");
+  return `<div class="msg"><span class="av">${mark(agent, 18)}</span><div class="card ${live ? "live" : "old"}">${body}${ah}</div></div>`;
+}
+function tickFor(e) {
+  if (S.toast && S.toast.exId === e.id) return ["5 秒內可撤回", "wait"];
+  const h = (S.hist.now || [])[e.h]; if (!h) return ["", ""];
+  return h.res === "處理中…" ? [`✓ 已轉給 ${esc(h.project)} · 處理中…`, "run"] : [`✓✓ ${esc(h.res)}`, ""];
+}
+function pendHTML() {
+  const cur = current(); const rest = items().filter(i => !cur || i.id !== cur.item);
+  if (!rest.length) return "";
+  const stack = rest.slice(0, 5).map((i, n) => `<span class="stk" style="z-index:${9 - n}">${mark(i.agent, 16)}</span>`).join("");
+  return `<div class="pend"><button class="phead" data-a="pend" aria-expanded="${S.ui.pendOpen}"><span class="stack">${stack}</span><span>尚有 ${rest.length} 個待辦事項要處理</span><span style="color:var(--muted)">${S.ui.pendOpen ? "▴" : "▾"}</span></button>
+    ${S.ui.pendOpen ? `<div class="plist">${rest.map(i => `<button data-a="jump" data-v="${i.id}">${mark(i.agent, 16)}<span><b style="color:var(--strong)">${esc(i.project)}</b>　${esc(i.q.split("\n")[0])}</span><span class="go">先處理</span></button>`).join("")}</div>` : ""}</div>`;
+}
+function phoneHTML() {
+  const cur = current(), it = cur && byId(cur.item), n = items().length;
+  let h = "";
+  DAYS.slice(0, S.ui.loaded).reverse().forEach(d => {
+    h += `<div class="daysep reveal"><span>${d}</span></div>` + S.hist[d].map(x => `<div class="reveal" style="display:grid;gap:10px"><div class="msg"><span class="av">${mark(x.agent, 18)}</span><div class="card old"><div class="cq">${esc(x.q)}</div></div></div><div class="mine"><div class="me">${esc(x.a)}</div><div class="tick">✓✓ ${esc(x.res)}</div></div></div>`).join("");
+  });
+  if (S.ui.loaded) h += `<div class="daysep"><span>這次打開 · ${S.ui.visit}</span></div>`;
+  h += `<div class="hero"><h3>晚安</h3><p>${n ? `有 ${n} 件事在等你` : running().length ? `${running().map(nameOf).join("、")} 還在跑，好了再叫你` : "沒有事在等你，可以睡了"}</p></div>`;
+  S.ex.forEach(e => {
+    const live = e === cur;
+    if (e.answer === "等下再說") { h += `<div class="sysline">排到最後了</div>`; return; }
+    h += questionHTML(e, live);
+    if (live) h += pendHTML();
+    if (e.answer) { const [t, c] = tickFor(e); h += `<div class="mine"><div class="me">${esc(e.answer)}</div><div class="tick ${c}">${t}</div></div>`; }
+  });
+  if (!cur) h += pendHTML();
+  let dock = "";
+  if (it) dock += `<div class="quiet"><button class="qchip" data-a="why">為什麼？</button><button class="qchip" data-a="ctx">前因後果？</button><span class="sp"></span><button class="qchip" data-a="skip">等下再說</button></div>${answersHTML(answersFor(it))}`;
+  const ph = it ? (it.kind === "reply" ? `或打字回覆 ${it.project}…` : it.kind === "decision" ? "打字會記成補充說明" : "用上面的按鈕回答") : "沒有事在等你";
+  const dis = !it || it.kind === "perm";
+  dock += `<div class="inrow"><button class="circ plus" data-a="new" aria-label="開新對話">＋</button><input id="msg" placeholder="${esc(ph)}" autocomplete="off" ${dis ? "disabled" : ""}><button class="circ send" data-a="send" aria-label="送出" ${dis ? "disabled" : ""}>↑</button></div>`;
+  return `<div class="scr"><div class="sbar"><span>23:44</span><i></i></div>
+    <div class="ph glass">${mark("k", 26)}<b>軍師</b><span class="st">Mac 已連線</span></div>
+    <div id="chat"><div class="pullind" id="pullind"><svg width="28" height="28" viewBox="0 0 28 28"><circle class="rb" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"/><circle class="rg" cx="14" cy="14" r="11" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="69.1" stroke-dashoffset="69.1" transform="rotate(-90 14 14)"/></svg><span id="pulltext"></span></div><div class="pad">${h}</div></div>
+    <div class="dock glass" id="dock">${dock}</div></div>
+    ${S.toast ? `<div class="toast glass" role="status"><div class="tx"><b>已送出${esc(S.toast.label)}</b><span>5 秒內可撤回，撤回前不會送到 Mac</span></div><button data-a="undo">撤回</button><div class="bar"></div></div>` : ""}
+    ${sheetHTML()}`;
+}
+function sheetHTML() {
+  const sh = S.sheet; if (!sh) return "";
+  let inner = "";
+  if (sh.kind === "money") {
+    const d = S.decisions.find(x => x.id === sh.id); if (!d) return "";
+    inner = `<h4>核對後送出</h4><div class="sub">${esc(d.project)} · ${AG[d.agent]}</div><div class="cq" style="text-align:center">${esc(d.q)}</div>
+      <div class="sign"><span class="t">所見即所簽</span>${d.money.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>
+      <div class="list" role="radiogroup">${d.opts.map((o, i) => `<button role="radio" aria-checked="${sh.sel === i}" data-a="msel" data-i="${i}"><span>${esc(o.l)}</span><span>${sh.sel === i ? "✓" : ""}</span></button>`).join("")}</div>
+      <button class="btn primary big" data-a="mok" ${sh.sel == null ? "disabled" : ""}>${d.opts[sh.sel] && d.opts[sh.sel].rec ? "批准並執行" : "送出決定"}</button><button class="btn big" data-a="close" style="border:0;background:none;color:var(--muted)">先不要</button>`;
+  } else if (sh.kind === "receipt") {
+    inner = `<h4>已批准</h4><div class="sub">${esc(sh.label)}</div><div class="list"><button>Kunsu 已收到正式答案<span>✓</span></button><button>已簽章，交給 executor 執行<span>✓</span></button><button>已交給等待中的原對話<span>↪</span></button></div><button class="btn primary big" data-a="close">完成</button>`;
+  } else if (sh.kind === "new") {
+    inner = `<h4>新對話</h4><div class="seg" style="align-self:center">${["claude", "codex"].map(a => `<button data-a="nag" data-v="${a}" aria-pressed="${sh.agent === a}">${AG[a]}</button>`).join("")}</div>
+      <div class="list" role="radiogroup">${["kunsu", "ads-review", "blog-site", "demo-shop"].map(p => `<button role="radio" aria-checked="${sh.project === p}" data-a="npr" data-v="${p}"><span>${p}</span><span class="cw">~/Desktop/${p}</span></button>`).join("")}</div>
+      <div class="cw" style="text-align:center">權限：Auto（一般動作自己做，高風險才回來問你）</div>
+      <textarea class="ta" id="newtext" placeholder="要做什麼？"></textarea><button class="btn primary big" data-a="nstart">開始</button>`;
+  }
+  return `<div class="sheetbg" data-a="bg"><div class="sheet glass" role="dialog" aria-modal="true"><div class="grab"></div>${inner}</div></div>`;
+}
+
+/* ---------- 電腦：主視窗 + 決策介面 ---------- */
+const icon = {
+  inbox: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+  hist: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>',
+  loop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
+  bank: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21h18M4 10h16M12 3l9 5H3zM6 10v8M10 10v8M14 10v8M18 10v8"/></svg>',
+  bot: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13v2M15 13v2"/></svg>',
+  bell: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17 17 0 0 1 18 8M6.3 6.3A6 6 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.3-5M2 2l20 20"/></svg>',
+};
+function macHTML() {
+  const list = items();
+  const rows = list.length ? `<div class="table">${list.map(i => `<button class="tr" data-a="openov" data-v="${i.id}">${mark(i.agent, 20)}<span style="min-width:0"><span class="q" style="display:block">${esc(i.q.split("\n")[0])}</span><span class="sub">${esc(i.project)} · ${AG[i.agent]}</span></span>
+      <span class="pillst ${i.kind === "decision" && i.d.money ? "warn" : "neutral"}">${i.kind === "decision" ? (i.d.money ? "動錢" : "要你決定") : i.kind === "perm" ? "要你批准" : "等你回話"}</span><span class="tm">${i.kind === "decision" ? i.d.time : "23:40"}</span><span style="color:var(--faint)">›</span></button>`).join("")}</div>`
+    : `<div class="table"><div class="empty">${icon.inbox}<b>Agent 都能繼續工作</b><span>沒有待決事項時，Kunsu 安靜待在選單列，不佔用你的螢幕。</span></div></div>`;
+  const notch = list.length ? `<div class="notch">${mark(list[0].agent, 16)}<span>你有 ${list.length} 則待處理通知</span></div>` : "";
+  return `${notch}<div class="win"><aside class="side"><div class="lights"><i></i><i></i><i></i></div>
+      <div class="brand">${mark("k", 24)}Kunsu</div>
+      <div class="grp">收件匣</div><div class="nav on">${icon.inbox}待決事項${list.length ? `<span class="ct">${list.length}</span>` : ""}</div><div class="nav">${icon.hist}歷史紀錄</div>
+      <div class="grp">管理</div><div class="nav">${icon.loop}督導</div><div class="nav">${icon.bank}董事會</div><div class="nav">${icon.bot}Agents</div>
+      <div class="presence">${list.length ? `${list.length} 題正在等你` : "目前沒有待決"}</div></aside>
+    <section class="main"><div class="mh"><h2>待決事項</h2><span class="sp"></span><button class="btn">${icon.bell}勿擾模式</button></div>
+      <div class="mb"><div class="intro">這些問題擋住了 Agent 的下一步；回答後，工作從原本的對話繼續。</div>${rows}</div></section></div>
+    ${S.ov ? overlayHTML() : ""}`;
+}
+function overlayHTML() {
+  const it = byId(S.ov.id); if (!it) { S.ov = null; return ""; }
+  const n = items(), pos = n.findIndex(x => x.id === it.id) + 1;
+  let body = "", foot = "";
+  if (it.kind === "decision") {
+    const d = it.d, sel = S.ov.sel;
+    body = `<div class="cap">要你決定</div><div class="dq">${esc(d.q)}</div><div class="dw">${esc(d.why)}</div>
+      ${d.money ? `<div class="sign"><span class="t">所見即所簽</span>${d.money.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>` : ""}
+      <div class="opts" role="radiogroup">${d.opts.map((o, i) => `<button class="opt" role="radio" aria-checked="${sel === i}" data-a="osel" data-i="${i}"><span class="k">${i + 1}</span><span style="min-width:0"><span class="l">${esc(o.l)}${o.rec ? '<span class="rec">AI 建議</span>' : ""}</span>${o.d ? `<div class="d">${esc(o.d)}</div>` : ""}</span></button>`).join("")}</div>`;
+    foot = `<button class="ghost" data-a="ovclose">這題不該問我</button><span class="sp"></span><button class="btn primary big" data-a="osend" ${sel == null ? "disabled" : ""}>${sel != null && d.money && d.opts[sel].rec ? "批准並執行" : "送出決定"}</button>`;
+  } else if (it.kind === "perm") {
+    body = `<div class="cap">要你批准</div><div class="dq">要執行這個指令嗎？</div><div class="cmd">${esc(it.s.perm.cmd)}</div><div class="dw">${esc(it.s.perm.why)}</div>`;
+    foot = `<span class="sp"></span><button class="btn big" data-a="operm" data-i="0">拒絕</button><button class="btn primary big" data-a="operm" data-i="1">允許一次</button>`;
+  } else {
+    const o = optsFromText(lastAI(it.s));
+    body = `<div class="cap">等你回話</div><div class="dq" style="font-size:20px;font-weight:500">${esc(lastAI(it.s).split("\n").filter(l => !/^[A-D][.．、]/.test(l.trim())).join("\n"))}</div>
+      <div class="opts">${o.map((x, i) => `<button class="opt" data-a="oreply" data-t="${esc(x.key + "（" + x.l + "）")}"><span class="k">${x.key}</span><span class="l">${esc(x.l)}</span></button>`).join("")}</div>`;
+    foot = `<span class="ghost">回覆會送回原本的對話</span><span class="sp"></span><button class="btn big" data-a="ovclose">稍後再問</button>`;
+  }
+  return `<div class="ov" data-a="ovbg"><div class="dpanel glass" role="dialog" aria-modal="true" aria-label="決策介面">
+    <div class="dh">${mark(it.agent, 22)}<div><div class="who">${AG[it.agent]} · ${esc(it.project)}</div><div class="meta">第 ${pos} 題，共 ${n.length} 題</div></div><span class="sp"></span><button class="btn" data-a="ovclose">稍後再問 <span style="color:var(--muted);font-size:12px">15 分鐘後再問 · Esc</span></button></div>
+    <div class="db">${body}</div><div class="df">${foot}</div></div></div>`;
+}
+
+/* ---------- render ---------- */
+const phone = document.getElementById("phone"), mac = document.getElementById("mac");
+let stick = true;
+function renderAll() {
+  mac.innerHTML = macHTML();
+  const chat = document.getElementById("chat");
+  const prev = chat ? { top: chat.scrollTop, h: chat.scrollHeight } : null;
+  const keep = document.getElementById("msg"); const draft = keep ? keep.value : "", foc = document.activeElement === keep;
+  phone.innerHTML = phoneHTML();
+  const inp = document.getElementById("msg"); if (inp && draft) inp.value = draft; if (inp && foc) inp.focus();
+  const dock = document.getElementById("dock"), c = document.getElementById("chat");
+  const ph = phone.clientHeight;
+  phone.style.setProperty("--amax", Math.round(ph * 0.38) + "px");
+  c.querySelector(".pad").style.setProperty("--dock", (dock.offsetHeight + 24) + "px");
+  const ans = document.getElementById("answers"), hint = document.getElementById("fadehint");
+  if (ans && hint) { const upd = () => { hint.hidden = ans.scrollHeight - ans.scrollTop - ans.clientHeight < 8; }; upd(); ans.addEventListener("scroll", upd, { passive: true }); }
+  if (S.ui.anchor === "prepend" && prev) c.scrollTop = c.scrollHeight - prev.h + prev.top;
+  else if (S.ui.anchor === "keep" && prev) c.scrollTop = prev.top;
+  else c.scrollTop = c.scrollHeight;
+  S.ui.anchor = null; stick = false;
+  attachPull(c); paintPull();
+}
+
+/* 往下拉看稍早 */
+const FULL = 90; let pull = 0, ty = null, wt = null, busy = false;
+const more = () => S.ui.loaded < DAYS.length;
+function paintPull() {
+  const c = document.getElementById("chat"); if (!c) return;
+  const ind = document.getElementById("pullind"), pad = c.querySelector(".pad"), r = Math.min(pull / FULL, 1);
+  pad.style.transform = pull ? `translateY(${Math.min(pull, FULL * 1.25)}px)` : "";
+  ind.style.opacity = busy ? 1 : Math.max(0, Math.min((pull - 16) / 30, 1));
+  ind.querySelector(".rg").setAttribute("stroke-dashoffset", busy ? 52 : (69.1 * (1 - r)).toFixed(1));
+  ind.classList.toggle("ready", r >= 1 && !busy); ind.classList.toggle("loading", busy);
+  document.getElementById("pulltext").textContent = busy ? "載入稍早的紀錄…" : !more() ? "沒有更早的紀錄了" : r >= 1 ? "放開就展開稍早的紀錄" : "往下拉，看稍早的紀錄";
+}
+function release() {
+  if (busy) return;
+  if (pull >= FULL && more()) { busy = true; pull = 48; paintPull(); setTimeout(() => { busy = false; pull = 0; S.ui.loaded++; S.ui.anchor = "prepend"; renderAll(); const c = document.getElementById("chat"); c.scrollTo({ top: Math.max(0, c.scrollTop - 260), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }, 550); }
+  else { pull = 0; paintPull(); }
+}
+function attachPull(c) {
+  c.addEventListener("touchstart", e => { ty = c.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+  c.addEventListener("touchmove", e => { if (ty == null || busy) return; const dy = e.touches[0].clientY - ty; if (dy > 0 && c.scrollTop <= 0) { e.preventDefault(); pull = dy * .6; paintPull(); } }, { passive: false });
+  c.addEventListener("touchend", () => { if (ty != null) release(); ty = null; });
+  c.addEventListener("wheel", e => {
+    if (busy) { e.preventDefault(); return; }
+    if (c.scrollTop <= 0 && e.deltaY < 0) { e.preventDefault(); pull = Math.min(pull - e.deltaY * .35, FULL * 1.3); paintPull(); clearTimeout(wt); wt = setTimeout(release, 180); }
+    else if (pull && e.deltaY > 0) { e.preventDefault(); pull = Math.max(0, pull - e.deltaY * .35); paintPull(); clearTimeout(wt); wt = setTimeout(release, 180); }
+  }, { passive: false });
+}
+
+/* ---------- events ---------- */
+function onClick(ev) {
+  const el = ev.target.closest("[data-a]"); if (!el) return;
+  const a = el.dataset.a, v = el.dataset.v, i = el.dataset.i;
+  if ((a === "bg" || a === "ovbg") && ev.target !== el) return;
+  const cur = current(), it = cur && byId(cur.item);
+  switch (a) {
+    case "undo": undo(); break;
+    case "bg": case "close": S.sheet = null; renderAll(); break;
+    case "dec": answerDecision(v, +i); break;
+    case "perm": permit(v, i === "1"); break;
+    case "reply": sendReply(v, el.dataset.t); break;
+    case "send": { const x = document.getElementById("msg"), t = x.value.trim(); if (!t || !it) break; x.value = "";
+      if (it.kind === "reply") sendReply(it.s.id, t); else { cur.asks.push({ q: t, a: "記下來了，會跟著你的答案一起交給 AI。這題還是要按選項回答。" }); renderAll(); } break; }
+    case "why": if (!it) break; cur.asks.push({ q: "為什麼？", a: it.kind === "decision" ? (() => { const r = it.d.opts.find(o => o.rec); return `AI 建議「${r.l}」。${r.d ? r.d + "。" : ""}${it.d.why}`; })() : it.kind === "perm" ? it.s.perm.why : "它剛做完上一步，下一步要你決定。" }); renderAll(); break;
+    case "ctx": if (!it) break; { const sid = it.kind === "decision" ? it.d.session : it.s.id, s = sid && S.sessions[sid];
+      cur.asks.push(s ? { q: "前因後果？", quote: [`${it.project} · ${AG[it.agent]}`].concat(s.turns.slice(-4).map(t => t.u ? "你：" + t.u : t.t ? "⚙︎ " + t.t : t.a ? "AI：" + t.a.split("\n")[0] : "")) } : { q: "前因後果？", a: `${it.project}：這題是排程直接問你的，沒有對應的對話。` }); renderAll(); break; }
+    case "skip": if (!cur) break; S.skipped = S.skipped.filter(x => x !== cur.item).concat(cur.item); cur.answer = "等下再說"; askNext(); renderAll(); break;
+    case "fold": S.ui.asksOpen[v] = !S.ui.asksOpen[v]; S.ui.anchor = "keep"; renderAll(); break;
+    case "pend": S.ui.pendOpen = !S.ui.pendOpen; renderAll(); break;
+    case "jump": if (cur) S.ex.pop(); S.skipped = items().map(x => x.id).filter(x => x !== v); S.ui.pendOpen = false; askNext(); renderAll(); break;
+    case "msel": S.sheet.sel = +i; renderAll(); break;
+    case "mok": answerDecision(S.sheet.id, S.sheet.sel, true); break;
+    case "new": S.sheet = { kind: "new", agent: "claude", project: "kunsu" }; renderAll(); break;
+    case "nag": S.sheet.agent = v; renderAll(); break;
+    case "npr": S.sheet.project = v; renderAll(); break;
+    case "nstart": { const t = document.getElementById("newtext").value.trim(); if (!t) break; const id = "n" + Date.now();
+      S.sessions[id] = { id, name: S.sheet.project, agent: S.sheet.agent, status: "run", run: "思考中", turns: [{ u: t }] };
+      (S.hist.now = S.hist.now || []).push({ agent: S.sheet.agent, project: S.sheet.project, time: "剛剛", q: "你開了新對話", a: t, res: "開始處理了。" });
+      S.sheet = null; resume(id); renderAll(); break; }
+    // Mac
+    case "openov": S.ov = { id: v, sel: null }; renderAll(); break;
+    case "ovbg": case "ovclose": S.ov = null; renderAll(); break;
+    case "osel": S.ov.sel = +i; renderAll(); break;
+    case "osend": { const d = byId(S.ov.id).d; const sel = S.ov.sel; S.ov = null; if (d.money && d.opts[sel].rec) answerDecision(d.id, sel, true); else answerDecision(d.id, sel); break; }
+    case "operm": permit(byId(S.ov.id).s.id, i === "1"); break;
+    case "oreply": { const sid = byId(S.ov.id).s.id; S.ov = null; sendReply(sid, el.dataset.t); break; }
+  }
+}
+phone.addEventListener("click", onClick); mac.addEventListener("click", onClick);
+phone.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing && e.target.id === "msg") phone.querySelector('[data-a="send"]').click(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.ov) { S.ov = null; renderAll(); } });
+
+function setTheme(t) {
+  if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  document.querySelectorAll("#theme [data-th]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.th === t)));
+  try { localStorage.setItem("kunsu-theme", t); } catch (e) {}
+}
+document.getElementById("theme").addEventListener("click", e => { const b = e.target.closest("[data-th]"); if (b) setTheme(b.dataset.th); });
+document.getElementById("view").addEventListener("click", e => {
+  const b = e.target.closest("[data-v]"); if (!b) return;
+  document.querySelectorAll("#view [data-v]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  document.getElementById("macCol").hidden = b.dataset.v === "phone";
+  document.getElementById("phoneCol").hidden = b.dataset.v === "mac";
+  document.getElementById("stage").classList.toggle("solo", b.dataset.v !== "all");
+  renderAll();
+});
+document.getElementById("reset").addEventListener("click", () => { fresh(); renderAll(); });
+document.getElementById("reopen").addEventListener("click", () => { if (S.toast) { clearTimeout(S.toast.timer); const t = S.toast; S.toast = null; t.commit(); } S.sheet = null; S.ui.visit = "23:52"; openVisit(); renderAll(); });
+let th = "system"; try { th = localStorage.getItem("kunsu-theme") || "system"; } catch (e) {}
+setTheme(th); fresh(); renderAll();
+</script>

@@ -1,0 +1,25 @@
+[package]
+name = "kunsu-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "kunsu binary：ask/wait/drain/list/answer/rebuild-db/doctor（HTTP client 打 127.0.0.1:4777；server 死時 ask 降級落 ~/.kunsu/inbox）。"
+
+[[bin]]
+name = "kunsu"
+path = "src/main.rs"
+
+[dependencies]
+kunsu-core = { path = "../kunsu-core" }
+# rebuild-db 的本地 fallback（server 死時直接以 lib 重建 SQLite）
+kunsu-server = { path = "../kunsu-server" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["clock"] }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+toml = { workspace = true }
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

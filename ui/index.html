@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Kunsu 軍師</title>
+    <script id="kunsu-theme-boot">
+      // 主視窗與蓋板的外觀在首次繪製前套用（不閃白；邏輯同 src/app/theme.ts applyTheme）。蓋板不標 data-surface；瀏海與畫布檢查視窗不動。
+      ;(function () {
+        var view = new URLSearchParams(window.location.search).get('view')
+        if (view === 'capsule' || view === 'canvas-check') return
+        var pref = 'light'
+        try {
+          var stored = window.localStorage.getItem('kunsu:theme:v1')
+          if (stored === 'system' || stored === 'light' || stored === 'dark') pref = stored
+        } catch (e) {}
+        var dark = pref === 'dark' || (pref === 'system' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        var root = document.documentElement
+        if (view !== 'overlay') root.dataset.surface = 'app'
+        root.dataset.theme = dark ? 'dark' : 'light'
+        root.style.colorScheme = dark ? 'dark' : 'light'
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+target/
+node_modules/
+dist/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+.env
+scripts/backlog_pack.json
+
+# Python transport tests
+__pycache__/
+*.pyc
+
+# 本機產出與 Vite 快取
+output/
+.vite/

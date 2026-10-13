@@ -1,0 +1,31 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "kunsu",
+  "version": "0.3.1",
+  "description": "Local decision inbox integration for Claude and Codex, with original-conversation continuity and human-only answers.",
+  "author": {
+    "name": "Ray"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Kunsu 軍師",
+        "shortDescription": "需要你的決定時，讓 AI 正式來問你",
+        "longDescription": "使用者的本機強制決策收件匣。Claude 與 Codex 使用既有 MCP 建題、預覽證據、等待正式回答並接續原對話；不代答、不自動授權。憑證只從本機 Kunsu token 檔讀取。",
+        "developerName": "Ray",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive",
+          "Read",
+          "Write"
+        ],
+        "logo": "./assets/logo.png",
+        "composerIcon": "./assets/logo.png",
+        "defaultPrompt": [
+          "把這個需要我決定的問題送到 Kunsu",
+          "用 Kunsu 製作有證據和選項的決策題"
+        ]
+      }
+    }
+  }
+}

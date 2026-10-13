@@ -1,0 +1,52 @@
+[package]
+name = "kunsu-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Kunsu 服務層＋協定層：SQLite 儲存、ServerHandle、timer loop、vault ledger、事件廣播、axum HTTP/MCP/WS、批准簽章鏈、reactor、inbox ingester、Discord webhook。"
+
+[dependencies]
+kunsu-core = { path = "../kunsu-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_path_to_error = "0.1.20"
+# server 層需要系統時鐘（timer loop 傳 Utc::now() 進 tick）；core 仍禁 clock
+chrono = { workspace = true, features = ["clock"] }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+axum = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+reqwest = { workspace = true }
+serde_yaml_ng = "0.10.0"
+base64 = "0.22"
+libc = "0.2"
+pulldown-cmark = { version = "0.13", default-features = false }
+# 設定頁的 policy.local.toml 讀寫與 Codex 設定檢查（CONTRACT §15）
+toml = { workspace = true }
+# 手機配對與 Zeabur 中轉（PRD §30.8；docs/design/mobile-relay.md）
+kunsu-mobile = { path = "../kunsu-mobile" }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Keychain（service me.ray.kunsu.approval-hmac）——HMAC key 唯一正本
+security-framework = "3"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[[bin]]
+name = "kunsu-serverd"
+path = "src/bin/kunsu-serverd.rs"
+required-features = []
+
+# serverd 需要 log 輸出；lib 本身只用 tracing facade
+[dependencies.tracing-subscriber]
+workspace = true

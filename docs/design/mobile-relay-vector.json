@@ -1,0 +1,57 @@
+{
+  "d2m": {
+    "envelope": {
+      "ct": "w-fTCYKAF93GhnzI61I77YzbvXTW_yp2Q45t-pOo5kECtfgLv1o23IUEMwHKVER7F840hiOR3xi60gyuQb1Nmrf317g",
+      "dev": "43zzg2isov45edk6",
+      "nonce": "BQUFBQUFBQUFBQUF",
+      "seq": 7,
+      "sig": "fABTA2sThBGuIBiuEQlkikkWL_Z-w7hdBncvhkhvLWiOx7FPrSsE0DjcylR3aqD9k7JCqKAOG_saJnnsadl6IQ",
+      "ts": 1791800000,
+      "v": 1
+    },
+    "plaintext": "{\"choice_id\":\"a\",\"question_id\":\"q1\",\"type\":\"answer\"}"
+  },
+  "dev_sig_pub": "BHMQPsMLPM9X2q4I6TU0rvFEo1lAz2u7oSoM98vV1lpk2CyMmenTxF-SRbqbJ5gsmuqOwduUsZxEeVlCwOsiqjI",
+  "device_id": "43zzg2isov45edk6",
+  "m2d": {
+    "envelope": {
+      "ct": "bErsPTa80AAjiXJ7fx07zLg1R3ZRt2A6zQGBoYWdq1aW9fc",
+      "dev": "43zzg2isov45edk6",
+      "nonce": "BgYGBgYGBgYGBgYG",
+      "seq": 9,
+      "sig": "VeZa-kgrO9UwCgnCXmiqtXAjIt7Fo3vJaFOab0cs4vX8jcJI859K-2Tu3PK0FT8VkV7hH-L6PElbIPJxI88uBA",
+      "ts": 1791800000,
+      "v": 1
+    },
+    "plaintext": "{\"type\":\"snapshot\"}"
+  },
+  "mac_id": "ni4ahvpqlgicuhdn",
+  "mac_kx_pub": "pOCSkrZRwni5dyxWn1-puxPZBrRqtoyd-dwrRAn4ogk",
+  "mac_sig_pub": "gTl3Dqh9F19Wo1Rmw0x-zMuNipG07jeiXfYPW4_Js5Q",
+  "pair": {
+    "code": "ABCD2345",
+    "device_name": "iPhone",
+    "nonce": "CAgICAgICAgICAgI",
+    "ts": 1791800000,
+    "wire": {
+      "ct": "uNO9hxWTcEbR8GQWmyVyoXlEUqr1T5-FxMjy5vU02ntrI1q0l7GbD-O-OrVOyLGTtyMA5xrjriMzOIm3LojNdoXKiUfyxSQf54wXnbO6KscNP9MAa8tlVEIUpRq3QR_mrUV6pqD7i4cSQjNQetEPCWug9Mr74Rl45Ez6Y4yYYZo6vRCAtbCwwip8KoERQQk0z9zVBVLEnmg9pbDQaFmmhbv7m7bW1OsVn1MsdWkzznBZEPj0ohaxixgNJArXl09-5QDDeKszqICelOwMXGSZ95bmDJtQoui7nnSK9zY",
+      "eph": "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ-xnTzf3_pe20",
+      "nonce": "CAgICAgICAgICAgI",
+      "t": "pair_request"
+    }
+  },
+  "pair_accepted": {
+    "dev": "43zzg2isov45edk6",
+    "mac": "ni4ahvpqlgicuhdn",
+    "sig": "wRCt2XYAkFWftcVKEjGSa2DGbWw1q3wIwVGQlfbs_fSLr6qPi-seVzwtlaXnMQy-9HNsHBBl_DTaGw-B7wxBDw",
+    "t": "pair_accepted",
+    "ts": 1791800000
+  },
+  "seeds": {
+    "dev_kx": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM",
+    "dev_sig": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+    "eph": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+    "mac_kx": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "mac_sig": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"
+  }
+}

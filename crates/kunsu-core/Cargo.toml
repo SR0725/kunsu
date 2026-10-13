@@ -1,0 +1,16 @@
+[package]
+name = "kunsu-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Kunsu 純函數層：型別、狀態機、建題驗證、policy 解析。零 I/O、零 async。"
+
+[dependencies]
+serde = { workspace = true }
+chrono = { workspace = true }
+toml = { workspace = true }
+# 解析 agent CLI 的 JSON 事件流（resume 失敗分類；純函數）
+serde_json = { workspace = true }
+# 題組每項內容雜湊（純函數；PRD §25 所見即所送）
+sha2 = { workspace = true }
+hex = { workspace = true }

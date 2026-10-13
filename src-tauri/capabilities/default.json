@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Kunsu 視窗（main/capsule/overlay，以及隱藏的證據畫布檢查視窗 canvas-check）的預設能力：core IPC + 事件監聽。畫布本身在沙盒 iframe 裡，拿不到 IPC。",
+  "windows": ["main", "capsule", "overlay", "canvas-check"],
+  "permissions": ["core:default"]
+}

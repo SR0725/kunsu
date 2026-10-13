@@ -1,0 +1,27 @@
+# Kunsu policy — 熱載；改這裡即生效，不用重編譯
+# 對應 CONTRACT.md §10；Claude 調參改這檔，不碰 Rust
+
+[force]
+cycle_min = 15           # 每輪完整強制詢問週期
+warn_before_min = 3      # 剩三分鐘時開始警告
+deferred_retry_s = 1     # guard 清除後幾乎立即強制
+
+[windows]
+t1_batch = ["09:45", "21:30"]   # 舊設定相容；force cycle 不再讀此批次窗
+quiet_hours = ["23:00", "09:00"]
+# quiet_enabled = true          # 睡眠時間開關（預設 true）；平常在主視窗設定頁改，存在 ~/.kunsu/policy.local.toml
+#                               # 這裡保持註解：回滾到舊版 app 時舊的 policy 解析器不認得這個鍵
+
+[expiry]
+t1_default_after_h = 48
+t2_supersede_after_d = 14
+
+[quota]
+per_source_daily_create = 12
+
+[fatigue]
+skip_rate_window_d = 7
+skip_rate_downgrade = 0.5   # 滑動窗略過率超過此值 → 該題型自動降級並在 Discord 承認
+
+[discord]
+webhook = ""   # 空 = 沿用 <vault 根>/projects/meta-ads/config.json 的 discord_webhooks.mkt_daily

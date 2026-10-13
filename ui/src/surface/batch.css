@@ -1,0 +1,110 @@
+/* 題組（PRD §25、DESIGN「Batch review」）：一鍵按鈕、項目卡清單、總結列。沿用決策面板的 --s-* tokens。
+   長內容一律換行或省略，不出現水平捲動。 */
+.batch-decision { min-width: 0; padding-bottom: 0; }
+
+.batch-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--s-hair); }
+.batch-bulk__btn { height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--s-hair-2); background: var(--s-card-2); color: var(--s-ink); font-size: 13px; cursor: pointer; transition: border-color 120ms ease, background 120ms ease; }
+.batch-bulk__btn[data-ghost="true"] { background: transparent; color: var(--s-ink-2); }
+.batch-bulk__btn[data-primary="true"] { background: var(--s-ink); border-color: var(--s-ink); color: var(--s-on-ink); font-weight: 600; }
+.batch-bulk__btn:hover:not(:disabled) { border-color: var(--s-hair-3); }
+.batch-bulk__btn:active:not(:disabled) { transform: scale(.975); }
+.batch-bulk__btn:disabled { opacity: .45; cursor: not-allowed; }
+.batch-bulk__hint { margin-left: auto; color: var(--s-ink-4); font-size: 12px; }
+
+.batch-redo { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--s-hair-2); background: var(--s-card); }
+.batch-redo label { color: var(--s-ink-3); font-size: 12px; }
+.batch-redo__row { display: flex; justify-content: flex-end; gap: 8px; }
+
+.batch-redo textarea,
+.batch-draft textarea { display: block; width: 100%; min-height: 44px; resize: none; overflow: hidden; overflow-wrap: anywhere; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-hair-2); background: var(--s-panel); color: var(--s-ink); font: inherit; font-size: 14px; line-height: 1.6; outline: none; }
+.batch-redo textarea:focus,
+.batch-draft textarea:focus { border-color: var(--s-hair-3); }
+
+.batch-list { list-style: none; margin: 14px 0 16px; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.batch-card { min-width: 0; padding: 10px 14px 12px; border: 1px solid var(--s-hair); border-radius: 14px; background: var(--s-card); transition: border-color 150ms ease, background 150ms ease, opacity 150ms ease; }
+.batch-card[data-selected="true"] { border-color: var(--s-hair-3); background: var(--s-card-2); }
+/* 焦點移到卡片或輸入框時，不被底部固定的送出列蓋住。 */
+.batch-card,
+.batch-card textarea,
+.batch-note input { scroll-margin-top: 12px; scroll-margin-bottom: 112px; }
+.batch-card[data-action="skip"] { opacity: .62; }
+.batch-card[data-action="skip"]:focus-within { opacity: .9; }
+
+.batch-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: 100%; min-width: 0; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.batch-card__head:focus-visible,
+.batch-receipt-row:focus-visible { outline: 2px solid var(--s-ink-3); outline-offset: 3px; border-radius: 6px; }
+.batch-card__num { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border: 1px solid var(--s-hair-2); border-radius: 6px; color: var(--s-ink-3); font-size: 12px; }
+.batch-card[data-selected="true"] .batch-card__num { border-color: var(--s-ink-3); color: var(--s-ink); }
+/* 標題換行顯示完整內容，不省略（AC-BR-02；QA 第 1 輪：窄版標題被截掉）。 */
+.batch-card__title { flex: 0 1 auto; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.batch-card__sub { flex: 1 1 8em; min-width: 0; overflow: hidden; color: var(--s-ink-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.batch-status { flex: none; margin-left: auto; padding: 1px 9px; border: 1px solid var(--s-hair-2); border-radius: 999px; color: var(--s-ink-3); font-size: 11px; white-space: nowrap; }
+.batch-status[data-s="approve"] { color: var(--s-good); border-color: var(--s-good-line); }
+.batch-status[data-s="edited"] { color: var(--s-info); border-color: var(--s-info-line); }
+.batch-status[data-s="revise"] { color: var(--s-warn); border-color: var(--s-warn-line); }
+
+.batch-card__excerpt { margin: 4px 0 8px 32px; overflow: hidden; color: var(--s-ink-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.batch-card__reason { margin: -4px 0 8px 32px; color: var(--s-ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.batch-draft,
+.batch-proposal,
+.batch-acts,
+.batch-note { margin-left: 32px; min-width: 0; }
+.batch-card[data-action="skip"] .batch-draft textarea,
+.batch-card[data-action="revise"] .batch-draft textarea { color: var(--s-ink-3); }
+.batch-draft__meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; color: var(--s-ink-4); font-size: 11px; }
+.batch-draft__meta .surface-link { font-size: 11px; }
+.batch-proposal { padding: 10px 12px; border: 1px solid var(--s-hair); border-radius: 10px; background: var(--s-panel); color: var(--s-ink-2); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.batch-proposal__label { display: block; margin-bottom: 2px; color: var(--s-ink-4); font-size: 11px; white-space: normal; }
+
+.batch-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.batch-acts button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 11px; border: 1px solid var(--s-hair-2); border-radius: 999px; background: transparent; color: var(--s-ink-2); font-size: 12px; cursor: pointer; }
+.batch-acts button:hover:not([aria-pressed="true"]) { border-color: var(--s-hair-3); color: var(--s-ink); }
+.batch-acts button[aria-pressed="true"] { border-color: var(--s-ink); background: var(--s-ink); color: var(--s-on-ink); font-weight: 600; }
+.surface-stage .batch-acts kbd { padding: 0; border: 0; background: none; color: var(--s-ink-4); font-size: 10px; }
+.surface-stage .batch-acts button[aria-pressed="true"] kbd { color: var(--s-on-ink-dim); }
+.batch-note { margin-top: 8px; }
+.batch-note input { width: 100%; height: 34px; padding: 0 12px; border: 1px solid var(--s-warn-line); border-radius: 10px; background: var(--s-panel); color: var(--s-ink); font-size: 13px; outline: none; }
+.batch-note input:focus { border-color: var(--s-warn); }
+
+/* 捲動的清單不從送出列底下露出來：底部留白放在送出列裡（sticky 貼著捲動區底邊）。 */
+.batch-foot { flex-wrap: wrap; padding-bottom: 22px; }
+.batch-foot__status { display: grid; gap: 2px; min-width: 0; margin-left: auto; text-align: right; }
+.batch-summary { color: var(--s-ink-2); font-size: 13px; }
+.batch-blocker { color: var(--s-warn); font-size: 12px; }
+.batch-redo .batch-blocker { margin: 0; }
+.batch-updated { color: var(--s-info); }
+
+.batch-original__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
+.batch-original__head span { color: var(--s-ink-3); font-size: 12px; }
+.batch-original__body { overflow-wrap: anywhere; }
+.batch-original__hint { margin: 10px 0 0; color: var(--s-ink-4); font-size: 12px; }
+
+.batch-receipt-list { margin-top: 16px; }
+.batch-receipt-list ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.batch-receipt-row { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 2px 0; border: 0; background: none; color: var(--s-ink-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.batch-receipt-note { margin: 2px 0 4px 32px; color: var(--s-ink-3); font-size: 12px; overflow-wrap: anywhere; }
+
+/* 選中卡片裡的原文：只在單欄（窄螢幕）時顯示。 */
+.batch-card__context { display: none; margin: 0 0 10px 32px; padding: 2px 0 2px 12px; border-left: 2px solid var(--s-hair-2); color: var(--s-ink-2); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+
+/* 單欄（面板本身 < 1100 px，與決策面板 index.css 同一個 container 條件，AC-DS-14）：題組的決定欄不自己捲動，整個面板
+   一起捲，送出列貼著面板底部；原文改在選中的卡片裡顯示。 */
+@container surface (width < 1100px) {
+  .surface-body[data-layout="split"] .batch-decision { overflow: visible; min-height: auto; }
+  .batch-original { display: none; }
+  .batch-card__context { display: block; }
+  .batch-card[data-selected="true"] .batch-card__excerpt { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batch-card, .batch-bulk__btn { transition: none; }
+}
+
+/* Assistant: source counts navigate without hiding any draft that will be sent. */
+.batch-sources {display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.batch-sources button {display:inline-flex;align-items:center;gap:7px;border:1px solid var(--s-hair-2);border-radius:9px;background:var(--s-card);color:var(--s-ink-2);padding:7px 10px;font:inherit;font-size:12px;cursor:pointer}
+.batch-sources b {font-variant-numeric:tabular-nums;color:var(--s-ink)}
+.batch-sources button:focus-visible,.batch-acts button:focus-visible {outline:2px solid var(--s-good);outline-offset:3px}
+.batch-acts button.batch-reviewed {border-color:var(--s-good-line);color:var(--s-good)}
+.batch-acts button.batch-reviewed[aria-pressed="true"] {background:var(--s-good);color:var(--s-on-ink);border-color:var(--s-good)}
+.batch-acts button:disabled {opacity:.45;cursor:wait}
